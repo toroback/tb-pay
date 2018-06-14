@@ -1,0 +1,27 @@
+{
+  "name": "tb-pay",
+  "version": "1.0.0",
+  "description": "Pay module to extend ToroBack functionality",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/toroback/tb-pay.git"
+  },
+  "keywords": [
+    "toroback",
+    "backend",
+    "pay"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/toroback/tb-pay/issues"
+  },
+  "homepage": "https://github.com/toroback/tb-pay#readme",
+  "dependencies": {
+    "express": "^4.16.3"
+  }
+}
