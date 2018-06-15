@@ -31,6 +31,7 @@ let moduleConfigId = "payOptions";
 let App;
 let log;
 
+let payOptions;
 
 /**
  * Clase que representa un gestor de pagos
@@ -40,13 +41,28 @@ class Client {
 
   /**
    * Crea un gestor de pagos. Utilizar los modulos tb-pay-payoneer, etc…
-   * @param  {Object} options               Objeto con las credenciales para el servicio.
+   * @param  {Object} options        Objeto con las credenciales para el servicio.
    * @param  {Object} Adapter        Adapter del servicio que se va a utilizar. 
    */
-  constructor(options, Adapter) {
+  constructor(service, options, Adapter) {
+    this.service = service;
     this.options = options || {};
-    this.adapter = new Adapter(this);
+    // this.adapter = new Adapter(this);
   }
+
+
+  confirm(data){
+    return new Promise((resolve,reject)=>{
+      let WebhookLog = App.db.model('tb.pay-webhook-logs');
+      let webhookLog = new WebhookLog({service: this.service, data: data});
+      webhookLog.save()
+        .then(resolve)
+        .catch(reject);
+
+    });
+  }
+
+
 
   /**
    * Setup del módulo. Debe ser llamado antes de crear una instancia
@@ -60,10 +76,11 @@ class Client {
 
       log.debug("iniciando Módulo Pay");
 
-      require("./routes")(app);
-    
-      resolve();
-
+      loadConfigOptions()
+        .then(setupExports)
+        .then(res => require("./routes")(app))
+        .then(resolve)
+        .catch(reject);
     });
   }
 
@@ -74,8 +91,9 @@ class Client {
    */
   static  init(){
     return new Promise( (resolve, reject) => {
-      // App.db.setModel('tb.payments-transaction',rscPath + '/tb.payments-transaction');
-      // App.db.setModel('tb.payments-register',rscPath + '/tb.payments-register');
+      App.db.setModel('tb.pay-transactions',rscPath + '/tb.pay-transactions');
+      App.db.setModel('tb.pay-accounts',rscPath + '/tb.pay-accounts');
+      App.db.setModel('tb.pay-webhook-logs',rscPath + '/tb.pay-webhook-logs');
       resolve();
     });
   }
@@ -99,33 +117,46 @@ class Client {
         loadServiceConfig(service)
         ])
         .then( (adapter, config) =>{
-          resolve( new Client(config,adapter));
+          resolve( new Client(service,config,adapter));
         })
         .catch(reject);
       
     });
   }
 
-  
+
+  static confirm(service, data){
+    return Client.forService(service)
+      .then(client => client.confirm(data));
+  }
+     /**
+   * Metodo que permite llamar a cualquier otro metodo del modulo comprobando con aterioridad si el usuario tiene permisos para acceder a este.
+   * @param {ctx} CTX Contexto donde se indicará el resource y el method a ejecutar
+   * @param {Object} CTX.client Aplicación cliente sobre la que se realizará la acción
+   * @return {Promise<Object>} Promesa con el resultado del metodo llamado
+  */
+  // static do(ctx){
+  //   return new Promise((resolve,reject) => {
+  //     var service  = ctx.resource || _defaultService;
+  //     App.acl.checkActions(ctx, ctx.model, ctx.method)
+  //       .then(() => {
+  //         //Hace la llamada al método correspondiente
+  //         return this[ctx.method](ctx.client,ctx.payload); 
+  //       })
+  //       .then(resolve)
+  //       .catch(reject);
+  //   });
+  // },
 }
 
 
 function loadServiceConfig(service){
   return new Promise((resolve, reject) =>{
-    let Config = App.db.model('tb.configs');
-    Config.findById(moduleConfigId)
-     .then( payOptions => { 
-        if(!pushOptions){
-          reject(new Error(moduleConfigId +' not configured'));
-        }else{
-          if(pushOptions[service]){
-            resolve(pushOptions[service]);
-          }else{
-            reject(new Error(service + ' options not configured'));
-          }
-        }
-     })
-    .catch(reject);
+    if(payOptions[service]){
+      resolve(payOptions[service]);
+    }else{
+      reject(new Error(service + ' options not configured'));
+    }
   });
 }
 
@@ -145,14 +176,58 @@ function loadServiceAdapter(service){
     }
 
     if(moduleName){
-      var adapter = require(moduleName);
-      resolve(adapter);
+      resolve({});
+      // var adapter = require(moduleName);
+      // resolve(adapter);
     }else{
       reject("Module not found for service " + service);
     }
   });
 }
 
+function setupExports(){
+  return new Promise((resolve, reject) => {
+    let utils = require("./lib/utils");
+
+    Client.serviceList           = utils.serviceList;
+    Client.accountStatusList     = utils.accountStatusList;
+    Client.transactionStatusList = utils.transactionStatusList;
+
+    exportPayoneerCurrencies()
+      .then(resolve)
+      .catch(reject);
+  });
+}
+
+function exportPayoneerCurrencies(){
+  return new Promise((resolve, reject) => {
+    loadServiceConfig("payoneer")
+      .then(payoneerConfig => {
+        if(payoneerConfig.programs){
+          Client.payoneer = {currencies:  Object.freeze(payoneerConfig.programs.map( e => e.currency ))};
+        }else{
+          log.info("payoneer programs not configured");
+        }
+        resolve();
+      })
+      .catch(reject);
+  });
+}
+
+function loadConfigOptions(){
+  return new Promise((resolve, reject) => {
+    let Config = App.db.model('tb.configs');
+    Config.findById(moduleConfigId)
+     .then( options => { 
+      if(!options){
+        reject(new Error(moduleConfigId +' not configured'));
+      }else{
+        payOptions = options.toJSON();
+        resolve(options);
+      }
+    })
+  });
+}
 module.exports = Client;
 
 

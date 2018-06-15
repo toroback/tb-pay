@@ -24,6 +24,22 @@ function setupRoutes(App){
     next();
   });
 
+  router.get("/webhook/:service/confirm",function(req, res, next){
+    var ctx = req._ctx;
+    let service = req.params.service;
+    let payload = ctx.payload;
+    ctx.model = "pay";
+    // ctx.method = 'confirm';
+
+    Client.confirm(service, req.query)
+    // Client.forService(service)
+      // .then(client => client.payRegistered(payload.data, payload.options))
+      .then(resp => res.status(200).json(resp))
+      .catch(next);
+
+     // log.debug("Confirm for service "+ service); 
+     // res.status(200).json("Confirm for service "+ service);
+  }); 
 
   router.get("/ping",function(req, res, next){
      log.debug("Pay module ping request"); 
