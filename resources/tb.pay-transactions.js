@@ -3,6 +3,8 @@ var utils    = require("../lib/utils");
 var mongoose = require('mongoose'),  
     Schema   = mongoose.Schema;
 
+var helper   = require("../helpers/tb.pay-transactions");
+
 /** 
  * Modelo de datos que contiene información sobre una cuenta de pago
  * @class PayAccountSchema
@@ -34,9 +36,9 @@ let schema  = new Schema ({
   originalRequest:  { type: Schema.Types.Mixed },  // optional: original request made by client when creating the account
   status:           { type: String, enum: utils.transactionStatusList, default: 'pending' },
   // auto-fill:
-  // statusLog: [ new Schema ({    // status change logging
-  //   status:         { type: String }
-  // }, { _id: false, timestamps: { createdAt: 'cDate' } }) ],
+  statusLog: [ new Schema ({    // status change logging
+    status:         { type: String }
+  }, { _id: false, timestamps: { createdAt: 'cDate' } }) ],
   // on response or hooks:
   sTransId:         { type: String }, // service transaction id (internal reference from <service> service)
   originalResponse: { type: Schema.Types.Mixed },  // optional: original response received by client when creating the account
@@ -56,5 +58,26 @@ schema.set('toJSON', { virtuals: true });
 // ---> Virtuals:
 schema.virtual('user', { ref: 'a2s.user', localField: 'uid', foreignField: '_id', justOne: true });
 schema.virtual('account', { ref: 'tb.pay-accounts', localField: 'paid', foreignField: '_id', justOne: true });
+
+//hooks  
+schema.pre('validate', function(next, ctx) {  // this can NOT be an arrow function
+  console.log('========>>> HOOK: pre validate (tb.pay-transactions)');
+  helper.preValidateHook(this)
+    .then(next)
+    .catch(next);
+});
+
+schema.pre('save', function(next, ctx) {  // this can NOT be an arrow function
+  console.log('========>>> HOOK: pre save (tb.pay-transactions)');
+  helper.preSaveHook(this)
+    .then(next)
+    .catch(next);
+});
+
+schema.post('save', function(doc) {  // this can NOT be an arrow function
+  console.log('========>>> HOOK: post save (tb.pay-transactions)');
+  helper.postSaveHook(doc);
+});
+
 
 module.exports = schema; 

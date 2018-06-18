@@ -33,6 +33,7 @@ let log;
 
 let payOptions;
 
+let loadedClients = {}; //Objeto que almacena un cliente cargado para cada servicio para evitar que se creen multiples instancias.
 /**
  * Clase que representa un gestor de pagos
  * @memberOf module:tb-pay
@@ -47,21 +48,118 @@ class Client {
   constructor(service, options, Adapter) {
     this.service = service;
     this.options = options || {};
-    // this.adapter = new Adapter(this);
+    this.adapter = new Adapter(App, this);
   }
 
 
   confirm(data){
     return new Promise((resolve,reject)=>{
+      let success = true;
       let WebhookLog = App.db.model('tb.pay-webhook-logs');
       let webhookLog = new WebhookLog({service: this.service, data: data});
       webhookLog.save()
-        .then(resolve)
+        .then(doc =>  this.processWebhook(this.service, data) )
+        .catch(res => {
+          success = false;
+          if(res.err) log.error(res.err);
+          return res;
+        })
+        .then(res => {
+          webhookLog.error = !success;
+          if(res.ref) webhookLog.ref = res.ref;
+          if(res.uid) webhookLog.uid = res.uid;
+          if(res.rid) webhookLog.rid = res.rid;
+        
+          return webhookLog.save();
+        })
+        .then(res => {
+          if(success)
+            resolve({status: "ok"});
+          else
+            reject(new Error("Server error"));
+        })
         .catch(reject);
 
     });
   }
 
+
+  processWebhook(service, data){
+    return new Promise((resolve, reject) => {
+      let ret = {}
+      this.adapter.processWebhook(data)
+        .then(res =>{
+          ret.ref = res.ref;
+          let docData = res.data;
+          if(res.ref == "account"){
+            let uid = docData.uid;
+            ret.uid = uid;
+            
+            let PayAccount = App.db.model('tb.pay-accounts');
+            PayAccount.findOne({uid: uid, service: service}, (err,account) =>{
+              if(err) reject(err);
+
+              if(!account) account = new PayAccount({service: service, uid: uid, status: "pending"});
+              
+              account.status = docData.status;
+              account.sUserId = docData.sUserId;
+              account.originalResponse = data;
+              account.save()
+                .then(doc => { 
+                  ret.rid = doc._id;
+                  resolve(ret);
+                })
+                .catch(err => { 
+                  ret.err = err; 
+                  reject(ret);
+                })
+                // .then(res =>{ resolve(ret); });
+             });
+
+          }else if(res.ref == "transaction"){
+
+            let uid = docData.uid;
+            ret.uid = uid;
+
+            App.db.model('tb.pay-transactions').findOne({_id: docData.paymentId, service: service}, (err,transaction) =>{
+              if(err) reject(err);
+
+              if(transaction){
+                transaction.status = docData.status;
+                // transaction.sTransId = docData.payoneerPaymentId;
+
+                if(docData.status == "rejected"){
+                  transaction.data = {
+                    code: docData.reasonCode,
+                    reason: docData.reasonDesc
+                  };
+                }else{
+                  transaction.data = {};
+                }
+
+                transaction.save()
+                  .then(doc => { 
+                    ret.rid = doc._id;
+                    resolve(ret);
+                  })
+                  .catch(err => { 
+                    ret.err = err; 
+                    reject(ret);
+                  })
+              }else{
+                reject(App.err.notFound("Transaction not found"));
+              }
+            });
+          }
+        })
+        .catch(err => { 
+          ret.err = err; 
+          reject(ret);
+        })
+        // .then(res =>{ resolve(ret); });
+        
+    });
+  }
 
 
   /**
@@ -110,16 +208,27 @@ class Client {
       if (!App)
         throw new Error('setup() needs to be called first');
 
-      service = service || "payoneer";
+      if (!service)
+        throw new Error('a service must be provided');
 
-      Promise.all([
-        loadServiceAdapter(service),
-        loadServiceConfig(service)
-        ])
-        .then( (adapter, config) =>{
-          resolve( new Client(service,config,adapter));
-        })
-        .catch(reject);
+      //Se busca un cliente ya creado para el servicio indicado y si no hay se instancia uno nuevo y se almacena en el objeto de clientes creados
+      let client = loadedClients[service];
+      if(!client){
+        Promise.all([
+          loadServiceAdapter(service),
+          loadServiceConfig(service)
+          ])
+          .then( resp =>{
+            let adapter = resp[0];
+            let config = resp[1];
+            let newClient =  new Client(service,config,adapter);
+            loadedClients[service] = newClient;
+            resolve(newClient);
+          })
+          .catch(reject);
+      }else{
+        resolve(client);
+      }
       
     });
   }
@@ -129,6 +238,7 @@ class Client {
     return Client.forService(service)
       .then(client => client.confirm(data));
   }
+
      /**
    * Metodo que permite llamar a cualquier otro metodo del modulo comprobando con aterioridad si el usuario tiene permisos para acceder a este.
    * @param {ctx} CTX Contexto donde se indicará el resource y el method a ejecutar
@@ -176,9 +286,9 @@ function loadServiceAdapter(service){
     }
 
     if(moduleName){
-      resolve({});
-      // var adapter = require(moduleName);
-      // resolve(adapter);
+      // resolve({})
+      var adapter = require(moduleName);
+      resolve(adapter);
     }else{
       reject("Module not found for service " + service);
     }
@@ -216,18 +326,140 @@ function exportPayoneerCurrencies(){
 
 function loadConfigOptions(){
   return new Promise((resolve, reject) => {
-    let Config = App.db.model('tb.configs');
-    Config.findById(moduleConfigId)
-     .then( options => { 
-      if(!options){
-        reject(new Error(moduleConfigId +' not configured'));
-      }else{
-        payOptions = options.toJSON();
-        resolve(options);
-      }
-    })
+    if(!payOptions){
+      let Config = App.db.model('tb.configs');
+      Config.findById(moduleConfigId)
+       .then( options => { 
+        if(!options){
+          reject(new Error(moduleConfigId +' not configured'));
+        }else{
+          payOptions = options.toJSON();
+          resolve(options);
+        }
+      })
+   }else{
+    resolve(payOptions);
+   }
   });
 }
+
+// function processWebhook(service, data){
+//   return new Promise((resolve, reject) => {
+//     let ret = {}
+//     adapter.processWebhook(data)
+//       .then(res =>{
+//         ret.ref = res.ref;
+//         var docData = res.data;
+//         if(res.ref == "account"){
+//           let uid = docData.uid;
+//           ret.uid = uid;
+//           let PayAccount = App.db.model('tb.pay-accounts');
+//           PayAccount.findOne({uid: uid, service: service}, (err,account) =>{
+//             if(!account){
+//               account = new PayAccount({service: service, uid: uid, status: "pending"});
+//             }
+//             account.status = docData.status;
+//             account.sUserId = docData.sUserId;
+//             account.originalResponse = data;
+//             account.save()
+//               .then(doc => { 
+//                 ret.rid = doc._id;
+//                 throw new Error("Testing error");
+//               })
+//               .catch(err => { 
+//                 ret.err = err;
+//                 // return Promise.resolve();
+//               })
+//               .then(res =>{
+//                 resolve(ret);
+//               });
+//            });
+
+
+//         }else if(res.ref == "transaction"){
+
+//         }
+//       });
+//   });
+//   // return new Promise((resolve, reject) => {
+//   //   if(service == 'payoneer'){
+//   //     processPayoneerWebhook(data)
+//   //       .then(resolve)
+//   //       .catch(reject);
+//   //   }else{
+//   //     reject('Invalid service '+service)
+//   //   }
+//   // });
+// }
+
+// function processPayoneerWebhook(data){
+//   return new Promise((resolve, reject) => {
+//     console.log("processPayoneerWebhook DATA" + JSON.stringify(data));
+
+//     let ref = undefined;
+//     let rid = undefined;
+//     let uid = data.payeeid;
+
+//     let promise = undefined;
+//     if(data.APPROVED || data.DECLINE){
+//       ref = "account";
+      
+//       promise = processPayoneerAccountWebhook(data);
+
+
+//     }else if(data.PAYMENT){
+//       ref = "transaction";
+//     }else if(data.LOADCC){
+//       ref = "transaction";
+//     }else if(data.LOADiACH){
+//       ref = "transaction";
+//     }else if(data.PaperCheck){
+//       ref = "transaction";
+//     }else if(data.CancelPayment){
+//       ref = "transaction";
+//     }else{
+//       throw new Error("Unknown webhook type");
+//     }
+    
+//     if(promise){
+//       promise.then(resolve).catch(reject);
+//     }else{
+//       resolve({});  
+//     }
+    
+//   });
+// }
+
+// function processPayoneerAccountWebhook(data){
+//   return new Promise((resolve, reject) => {
+//     let ref = "account";
+//     let rid = undefined;
+//     let uid = data.payeeid; 
+
+//     let PayAccount = App.db.model('tb.pay-accounts');
+//     PayAccount.findOne({uid: uid, service: "payoneer"}, (err,account) =>{
+//       if(!account){
+//         account = new PayAccount({service: "payoneer", uid: uid, status: "pending"});
+//       }
+//       account.status = data.APPROVED ? "approved" : "rejected";
+//       account.originalResponse = data;
+//       account.sUserId = data.Payoneerid;
+//       account.save()
+//         .then(doc => {
+//           rid = doc._id;
+//         })
+//         .catch(err => {
+//            log.info("catch err" + err)
+//           return Promise.resolve()
+//         })
+//         .then(res =>{
+//           log.info("2º then")
+//           resolve({ref: ref, uid: uid, rid: rid})
+//         });
+//     });
+//   });
+// }
+
 module.exports = Client;
 
 
