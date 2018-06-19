@@ -25,25 +25,34 @@ function setupRoutes(App){
   });
 
   router.get("/webhook/:service/confirm",function(req, res, next){
-    var ctx = req._ctx;
     let service = req.params.service;
-    let payload = ctx.payload;
-    ctx.model = "pay";
-    // ctx.method = 'confirm';
 
     Client.confirm(service, req.query)
-    // Client.forService(service)
-      // .then(client => client.payRegistered(payload.data, payload.options))
+      .then(resp => res.status(200).json(resp))
+      .catch(next);
+  }); 
+
+  router.get('/registrationlink/:service/:uid([0-9a-f]{24})', (req, res, next) => {
+    let service = req.params.service;
+    let uid     = req.params.uid;
+    let login   = req.query.login || false; 
+
+    Client.registrationLink(service, uid, login)
       .then(resp => res.status(200).json(resp))
       .catch(next);
 
-     // log.debug("Confirm for service "+ service); 
-     // res.status(200).json("Confirm for service "+ service);
-  }); 
+  });
 
   router.get("/ping",function(req, res, next){
      log.debug("Pay module ping request"); 
      res.status(200).json("pong")
+  }); 
+
+  router.get("/echo/:service/",function(req, res, next){
+    let service = req.params.service;
+    Client.echo(service)
+      .then(resp => res.status(200).json(resp))
+      .catch(next);
   }); 
 
   App.app.use(`${App.baseRoute}/srv/pay`, router);

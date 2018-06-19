@@ -27,6 +27,8 @@
 
 let rscPath  = __dirname +'/resources';
 
+var hook = require("./lib/hook");
+
 let moduleConfigId = "payOptions";
 let App;
 let log;
@@ -97,47 +99,15 @@ class Client {
             
             let PayAccount = App.db.model('tb.pay-accounts');
             PayAccount.findOne({uid: uid, service: service}, (err,account) =>{
-              if(err) reject(err);
+              if(err) reject(err)
+              else{
 
-              if(!account) account = new PayAccount({service: service, uid: uid, status: "pending"});
-              
-              account.status = docData.status;
-              account.sUserId = docData.sUserId;
-              account.originalResponse = data;
-              account.save()
-                .then(doc => { 
-                  ret.rid = doc._id;
-                  resolve(ret);
-                })
-                .catch(err => { 
-                  ret.err = err; 
-                  reject(ret);
-                })
-                // .then(res =>{ resolve(ret); });
-             });
-
-          }else if(res.ref == "transaction"){
-
-            let uid = docData.uid;
-            ret.uid = uid;
-
-            App.db.model('tb.pay-transactions').findOne({_id: docData.paymentId, service: service}, (err,transaction) =>{
-              if(err) reject(err);
-
-              if(transaction){
-                transaction.status = docData.status;
-                // transaction.sTransId = docData.payoneerPaymentId;
-
-                if(docData.status == "rejected"){
-                  transaction.data = {
-                    code: docData.reasonCode,
-                    reason: docData.reasonDesc
-                  };
-                }else{
-                  transaction.data = {};
-                }
-
-                transaction.save()
+                if(!account) account = new PayAccount({service: service, uid: uid, status: "pending"});
+                
+                account.status = docData.status;
+                account.sUserId = docData.sUserId;
+                account.originalResponse = data;
+                account.save()
                   .then(doc => { 
                     ret.rid = doc._id;
                     resolve(ret);
@@ -146,8 +116,44 @@ class Client {
                     ret.err = err; 
                     reject(ret);
                   })
-              }else{
-                reject(App.err.notFound("Transaction not found"));
+                  // .then(res =>{ resolve(ret); });
+              }
+           });
+
+
+          }else if(res.ref == "transaction"){
+
+            let uid = docData.uid;
+            ret.uid = uid;
+
+            App.db.model('tb.pay-transactions').findOne({_id: docData.paymentId, service: service}, (err,transaction) =>{
+              if(err) reject(err);
+              else{
+                if(transaction){
+                  transaction.status = docData.status;
+                  // transaction.sTransId = docData.payoneerPaymentId;
+
+                  if(docData.status == "rejected"){
+                    transaction.data = {
+                      code: docData.reasonCode,
+                      reason: docData.reasonDesc
+                    };
+                  }else{
+                    transaction.data = {};
+                  }
+
+                  transaction.save()
+                    .then(doc => { 
+                      ret.rid = doc._id;
+                      resolve(ret);
+                    })
+                    .catch(err => { 
+                      ret.err = err; 
+                      reject(ret);
+                    })
+                }else{
+                  reject(App.err.notFound("Transaction not found"));
+                }
               }
             });
           }
@@ -161,6 +167,140 @@ class Client {
     });
   }
 
+  createRegistrationLink(uid, forLogin){
+    return new Promise((resolve,reject)=>{
+      App.db.model('users').findById(uid, (err, user) => {
+        if(err) reject(err);
+        else if(!user) reject(App.err.notFound("user not foud"));
+        else{
+          let service = this.service;
+          let PayAccount = App.db.model('tb.pay-accounts');
+          PayAccount.findOne({uid: uid, service: service}, (err, account) => {
+            if(err) reject(err);
+            else if(account && account.status == "approved"){
+              //Si existe cuenta y está aprovada se devuelve la cuenta
+              resolve({
+                account:{
+                  uid: account.uid,
+                  service: account.service,
+                  programId: account.programId,
+                  status: account.status
+                }
+              });
+
+            }else{
+              //Si no existe cuenta o no está aprovada se pedirá el link al servicio
+              let linkUrl = undefined;
+              let programId = account ? account.programId : undefined;
+            
+              if(!programId){
+                let config = getServiceConfig(service);
+                if(config && config.programs && config.programs[0]){
+                  programId = config.programs[0].id;
+                }else{
+                  reject(App.err.notFound("No programId found for "+ service));
+                }
+              }
+
+              this.requestLink(user, programId, forLogin)
+                .then(res => {
+                  linkUrl = res.response.link;
+            
+                  if(!account) account = new PayAccount({service: service, uid: user._id, originalRequest: res.request, originalResponse: res.response, programId: programId});
+                  if(!account.programId) account.programId = programId;
+
+                  account.status = "pending";
+                  
+                  if(account._id) account.uDate = new Date();
+
+                  return account.save();
+                })
+                .then(doc => resolve({url: linkUrl}))
+                .catch(reject);
+              
+            }
+          });
+        }
+      })
+       
+    });
+  }
+
+  //TODO: acá se podría pasar un objeto que tenga todo lo que se va a usar en la funcion interior:
+  //que tenga, payload, forLogin y programId
+  requestLink(user, programId, forLogin){
+    return new Promise((resolve,reject)=>{
+      let payload = undefined;
+      this.prepareRequestLinkPayload({service: this.service, user: user, programId: programId, forLogin: forLogin})
+        .then(res =>{
+          payload = res;
+          return  this.adapter.createRegistrationLink({forLogin: forLogin, programId: programId, payload: payload})
+        })
+        .then(res =>{
+          log.debug("requestLink -" + JSON.stringify(res));
+          resolve({
+            response: res,
+            request: payload
+          });
+        })
+        .catch(reject);
+      
+    });
+  }
+
+  /**
+   * Prepara la información para solicitar la creación de un link de registro/login
+   * @param  {[type]} data      [description]
+   * @param  {[type]} data.service   [description]
+   * @param  {[type]} data.user      [description]
+   * @param  {[type]} data.programId [description]
+   * @param  {[type]} data.forLogin  [description]
+   * @return {[type]}           [description]
+   */
+  prepareRequestLinkPayload(data){
+    return new Promise((resolve,reject)=>{
+      resolve({
+        uid: data.user._id, 
+        payee:{
+          type: "INDIVIDUAL",
+          contact: {
+            firstName: data.user.name,
+            email: data.user.email ? data.user.email.login : undefined 
+          }
+        }
+      });
+    });
+  }
+
+  echo(){
+    return new Promise((resolve,reject)=>{
+      let config = getServiceConfig(this.service);
+      if(config && config.programs && config.programs[0]){
+        this.adapter.echo({programId:config.programs[0].id})   
+          .then(res =>{
+            log.debug("echo -" + JSON.stringify(res));
+            resolve(res);
+          })
+          .catch(reject)
+      }else{
+        reject(App.err.notFound("No programId found for "+ this.service));
+      } 
+
+      // loadServiceConfig(this.service)
+      //   .then(config =>{
+      //     if(config && config.programs && config.programs[0]){
+      //       return this.adapter.echo({programId:config.programs[0].id})   
+      //     }else{
+      //       reject("No programIf found for "+ this.service);
+      //     } 
+      //   })
+      //   .then(res =>{
+      //     log.debug("echo -" + JSON.stringify(res));
+      //     resolve(res);
+      //   })
+      //   .catch(reject);
+    });
+  }
 
   /**
    * Setup del módulo. Debe ser llamado antes de crear una instancia
@@ -214,13 +354,9 @@ class Client {
       //Se busca un cliente ya creado para el servicio indicado y si no hay se instancia uno nuevo y se almacena en el objeto de clientes creados
       let client = loadedClients[service];
       if(!client){
-        Promise.all([
-          loadServiceAdapter(service),
-          loadServiceConfig(service)
-          ])
-          .then( resp =>{
-            let adapter = resp[0];
-            let config = resp[1];
+        loadServiceAdapter(service)
+          .then(adapter =>{
+            let config = getServiceConfig(service);
             let newClient =  new Client(service,config,adapter);
             loadedClients[service] = newClient;
             resolve(newClient);
@@ -239,6 +375,15 @@ class Client {
       .then(client => client.confirm(data));
   }
 
+  static registrationLink(service, uid, login){
+    return Client.forService(service)
+      .then(client => client.createRegistrationLink(uid, login));
+  }
+
+  static echo(service){
+    return Client.forService(service)
+      .then(client => client.echo());
+  }
      /**
    * Metodo que permite llamar a cualquier otro metodo del modulo comprobando con aterioridad si el usuario tiene permisos para acceder a este.
    * @param {ctx} CTX Contexto donde se indicará el resource y el method a ejecutar
@@ -260,14 +405,22 @@ class Client {
 }
 
 
-function loadServiceConfig(service){
-  return new Promise((resolve, reject) =>{
-    if(payOptions[service]){
-      resolve(payOptions[service]);
-    }else{
-      reject(new Error(service + ' options not configured'));
-    }
-  });
+// function loadServiceConfig(service){
+//   return new Promise((resolve, reject) =>{
+//     if(payOptions[service]){
+//       resolve(payOptions[service]);
+//     }else{
+//       reject(new Error(service + ' options not configured'));
+//     }
+//   });
+// }
+
+function getServiceConfig(service){
+  if(payOptions[service]){
+    return payOptions[service];
+  }else{
+    throw new Error(service + ' options not configured');
+  }
 }
 
 function loadServiceAdapter(service){
@@ -303,25 +456,33 @@ function setupExports(){
     Client.accountStatusList     = utils.accountStatusList;
     Client.transactionStatusList = utils.transactionStatusList;
 
-    exportPayoneerCurrencies()
-      .then(resolve)
-      .catch(reject);
+    exportPayoneerCurrencies();
+    resolve();
+      // .then(resolve)
+      // .catch(reject);
   });
 }
 
 function exportPayoneerCurrencies(){
-  return new Promise((resolve, reject) => {
-    loadServiceConfig("payoneer")
-      .then(payoneerConfig => {
-        if(payoneerConfig.programs){
-          Client.payoneer = {currencies:  Object.freeze(payoneerConfig.programs.map( e => e.currency ))};
-        }else{
-          log.info("payoneer programs not configured");
-        }
-        resolve();
-      })
-      .catch(reject);
-  });
+  // return new Promise((resolve, reject) => {
+    let config = getServiceConfig("payoneer");
+    if(config && config.programs && config.programs.length){
+      Client.payoneer = {currencies:  Object.freeze(config.programs.map( e => e.currency ))};
+    }else{
+      log.warn("Payoneer programs not configured");
+    }
+    // resolve();
+    // loadServiceConfig("payoneer")
+    //   .then(payoneerConfig => {
+    //     if(payoneerConfig.programs){
+    //       Client.payoneer = {currencies:  Object.freeze(payoneerConfig.programs.map( e => e.currency ))};
+    //     }else{
+    //       log.info("payoneer programs not configured");
+    //     }
+    //     resolve();
+    //   })
+    //   .catch(reject);
+  // });
 }
 
 function loadConfigOptions(){
@@ -343,124 +504,38 @@ function loadConfigOptions(){
   });
 }
 
-// function processWebhook(service, data){
-//   return new Promise((resolve, reject) => {
-//     let ret = {}
-//     adapter.processWebhook(data)
-//       .then(res =>{
-//         ret.ref = res.ref;
-//         var docData = res.data;
-//         if(res.ref == "account"){
-//           let uid = docData.uid;
-//           ret.uid = uid;
-//           let PayAccount = App.db.model('tb.pay-accounts');
-//           PayAccount.findOne({uid: uid, service: service}, (err,account) =>{
-//             if(!account){
-//               account = new PayAccount({service: service, uid: uid, status: "pending"});
-//             }
-//             account.status = docData.status;
-//             account.sUserId = docData.sUserId;
-//             account.originalResponse = data;
-//             account.save()
-//               .then(doc => { 
-//                 ret.rid = doc._id;
-//                 throw new Error("Testing error");
-//               })
-//               .catch(err => { 
-//                 ret.err = err;
-//                 // return Promise.resolve();
-//               })
-//               .then(res =>{
-//                 resolve(ret);
-//               });
-//            });
+//Esto añade los hooks a las funciones de la clase, es decir, a las estáticas
+Client.hooks = {echo: "promise"};
+Client.pre = hook.pre;
+Client.post = hook.post;
 
-
-//         }else if(res.ref == "transaction"){
-
-//         }
-//       });
-//   });
-//   // return new Promise((resolve, reject) => {
-//   //   if(service == 'payoneer'){
-//   //     processPayoneerWebhook(data)
-//   //       .then(resolve)
-//   //       .catch(reject);
-//   //   }else{
-//   //     reject('Invalid service '+service)
-//   //   }
-//   // });
-// }
-
-// function processPayoneerWebhook(data){
-//   return new Promise((resolve, reject) => {
-//     console.log("processPayoneerWebhook DATA" + JSON.stringify(data));
-
-//     let ref = undefined;
-//     let rid = undefined;
-//     let uid = data.payeeid;
-
-//     let promise = undefined;
-//     if(data.APPROVED || data.DECLINE){
-//       ref = "account";
-      
-//       promise = processPayoneerAccountWebhook(data);
-
-
-//     }else if(data.PAYMENT){
-//       ref = "transaction";
-//     }else if(data.LOADCC){
-//       ref = "transaction";
-//     }else if(data.LOADiACH){
-//       ref = "transaction";
-//     }else if(data.PaperCheck){
-//       ref = "transaction";
-//     }else if(data.CancelPayment){
-//       ref = "transaction";
-//     }else{
-//       throw new Error("Unknown webhook type");
-//     }
-    
-//     if(promise){
-//       promise.then(resolve).catch(reject);
-//     }else{
-//       resolve({});  
-//     }
-    
-//   });
-// }
-
-// function processPayoneerAccountWebhook(data){
-//   return new Promise((resolve, reject) => {
-//     let ref = "account";
-//     let rid = undefined;
-//     let uid = data.payeeid; 
-
-//     let PayAccount = App.db.model('tb.pay-accounts');
-//     PayAccount.findOne({uid: uid, service: "payoneer"}, (err,account) =>{
-//       if(!account){
-//         account = new PayAccount({service: "payoneer", uid: uid, status: "pending"});
-//       }
-//       account.status = data.APPROVED ? "approved" : "rejected";
-//       account.originalResponse = data;
-//       account.sUserId = data.Payoneerid;
-//       account.save()
-//         .then(doc => {
-//           rid = doc._id;
-//         })
-//         .catch(err => {
-//            log.info("catch err" + err)
-//           return Promise.resolve()
-//         })
-//         .then(res =>{
-//           log.info("2º then")
-//           resolve({ref: ref, uid: uid, rid: rid})
-//         });
-//     });
-//   });
-// }
+//Esto añade los hooks a las funcines de las instancias de la clase.
+Client.prototype.hooks = {prepareRequestLinkPayload: "promise"};
+Client.prototype.pre = hook.pre;
+Client.prototype.post = hook.post;
 
 module.exports = Client;
 
+//EJEMPLO de llamada a pre hook. Tiene que hacer un parámetro más que la función a la que se le aplica el hook. Dicho parámetro extra es la función next que hay que llamar
+Client.pre("echo", function(service, next){
+  console.log("echo pre hook called for service " + service);
+  next();
+});
+
+Client.post("echo", function(service, res,  next){
+  console.log("echo post hook called for service " + service);
+  console.log("echo post hook res" + JSON.stringify(res));
+
+  next();
+});
+
+
+Client.prototype.post("prepareRegistrationLinkPayload", function(data, res,  next){
+  console.log("prepareRegistrationLinkPayload post hook data" + JSON.stringify(data));
+  console.log("prepareRegistrationLinkPayload post hook res" + JSON.stringify(res));
+  // res.payee = {type: "INDIVIDUAL"};
+  // res.payee.contact = {firstName: data.user.name};
+  next(res);
+});
 
 
