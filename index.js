@@ -98,27 +98,46 @@ class Client {
             ret.uid = uid;
             
             let PayAccount = App.db.model('tb.pay-accounts');
-            PayAccount.findOne({uid: uid, service: service}, (err,account) =>{
-              if(err) reject(err)
-              else{
-
+            PayAccount.findOne({uid: uid, service: service})
+              .then(account =>{
                 if(!account) account = new PayAccount({service: service, uid: uid, status: "pending"});
                 
                 account.status = docData.status;
                 account.sUserId = docData.sUserId;
                 account.originalResponse = data;
-                account.save()
-                  .then(doc => { 
-                    ret.rid = doc._id;
-                    resolve(ret);
-                  })
-                  .catch(err => { 
-                    ret.err = err; 
-                    reject(ret);
-                  })
-                  // .then(res =>{ resolve(ret); });
-              }
-           });
+                return account.save();              
+              })
+              .then(doc => { 
+                ret.rid = doc._id;
+                resolve(ret);
+              })
+              .catch(err => { 
+                ret.err = err; 
+                reject(ret);
+              });
+              // .catch(err => reject(ret));
+
+           //  PayAccount.findOne({uid: uid, service: service}, (err,account) =>{
+           //    if(err) reject(err)
+           //    else{
+
+           //      if(!account) account = new PayAccount({service: service, uid: uid, status: "pending"});
+                
+           //      account.status = docData.status;
+           //      account.sUserId = docData.sUserId;
+           //      account.originalResponse = data;
+           //      account.save()
+           //        .then(doc => { 
+           //          ret.rid = doc._id;
+           //          resolve(ret);
+           //        })
+           //        .catch(err => { 
+           //          ret.err = err; 
+           //          reject(ret);
+           //        })
+           //        // .then(res =>{ resolve(ret); });
+           //    }
+           // });
 
 
           }else if(res.ref == "transaction"){
@@ -169,59 +188,67 @@ class Client {
 
   createRegistrationLink(uid, forLogin){
     return new Promise((resolve,reject)=>{
-      App.db.model('users').findById(uid, (err, user) => {
-        if(err) reject(err);
-        else if(!user) reject(App.err.notFound("user not foud"));
-        else{
-          let service = this.service;
-          let PayAccount = App.db.model('tb.pay-accounts');
-          PayAccount.findOne({uid: uid, service: service}, (err, account) => {
-            if(err) reject(err);
-            else if(account && account.status == "approved"){
-              //Si existe cuenta y está aprovada se devuelve la cuenta
-              resolve({
-                account:{
-                  uid: account.uid,
-                  service: account.service,
-                  programId: account.programId,
-                  status: account.status
-                }
-              });
+      let service = this.service;
+      // let PayAccount = App.db.model('tb.pay-accounts');
+      //Se busca usuario y cuenta asociada al usuario para el servicio
 
-            }else{
-              //Si no existe cuenta o no está aprovada se pedirá el link al servicio
-              let linkUrl = undefined;
-              let programId = account ? account.programId : undefined;
-            
-              if(!programId){
-                let config = getServiceConfig(service);
-                if(config && config.programs && config.programs[0]){
-                  programId = config.programs[0].id;
-                }else{
-                  reject(App.err.notFound("No programId found for "+ service));
-                }
+      // Promise.all([
+      //    App.db.model('users').findById(uid),
+      //    PayAccount.findOne({uid: uid, service: service})
+      //   ])
+      findUserAndAccount(uid, service)
+        .then(res =>{
+          // let user = res[0];
+          // let account = res[1];
+          let user = res.user;
+          let account = res.account;
+
+          if(!user) throw App.err.notFound("user not foud");
+
+          if(account && account.status == "approved"){
+            //Si existe cuenta y está aprovada se devuelve la cuenta
+            resolve({
+              account:{
+                uid: account.uid,
+                service: account.service,
+                programId: account.programId,
+                status: account.status
               }
+            });
 
-              this.requestLink(user, programId, forLogin)
-                .then(res => {
-                  linkUrl = res.response.link;
-            
-                  if(!account) account = new PayAccount({service: service, uid: user._id, originalRequest: res.request, originalResponse: res.response, programId: programId});
-                  if(!account.programId) account.programId = programId;
-
-                  account.status = "pending";
-                  
-                  if(account._id) account.uDate = new Date();
-
-                  return account.save();
-                })
-                .then(doc => resolve({url: linkUrl}))
-                .catch(reject);
-              
+          }else{
+            //Si no existe cuenta o no está aprovada se pedirá el link al servicio
+            let linkUrl = undefined;
+            let programId = account ? account.programId : undefined;
+          
+            if(!programId){
+              let config = getServiceConfig(service);
+              if(config && config.programs && config.programs[0]){
+                programId = config.programs[0].id;
+              }else{
+                reject(App.err.notFound("No programId found for "+ service));
+              }
             }
-          });
-        }
-      })
+
+            this.requestLink(user, programId, forLogin)
+              .then(res => {
+                linkUrl = res.response.link;
+          
+                if(!account) account = new App.db.model('tb.pay-accounts')({service: service, uid: user._id, originalRequest: res.request, originalResponse: res.response, programId: programId});
+                if(!account.programId) account.programId = programId;
+
+                account.status = "pending";
+                
+                if(account._id) account.uDate = new Date();
+
+                return account.save();
+              })
+              .then(doc => resolve({url: linkUrl}))
+              .catch(reject);
+            
+          }
+        })
+        .catch(reject);
        
     });
   }
@@ -258,6 +285,8 @@ class Client {
    * @return {[type]}           [description]
    */
   prepareRequestLinkPayload(data){
+    let mobile = data.user.tel && data.user.tel.id ? "+"+data.user.tel.id : undefined;
+    log.debug("Request link payload "+ mobile);
     return new Promise((resolve,reject)=>{
       resolve({
         uid: data.user._id, 
@@ -265,12 +294,82 @@ class Client {
           type: "INDIVIDUAL",
           contact: {
             firstName: data.user.name,
-            email: data.user.email ? data.user.email.login : undefined 
+            email: data.user.email ? data.user.email.login : undefined,
+            mobile: data.user.tel && data.user.tel.id ? "+"+data.user.tel.id : undefined 
           }
         }
       });
     });
   }
+
+  payout(data){
+    //Procedimiento del pago:
+    // 1- Se buscan usuario y cuenta
+    // 2- Se comprueba que existan usuario y cuenta
+    // 3- Se crea un documento "transaction" y se guarda como pending
+    // 4- Se realiza el pago en el servicio 
+    // 5- Si todo fue bien se guarda como "processing", sino se guarda como "rejected"
+    return new Promise((resolve,reject)=>{
+      if(!data) throw App.err.badRequest("Payout data required");
+      if(!data.uid) throw App.err.badRequest("uid required");
+
+      let user, account, transaction;
+      let service = this.service;
+      let error = undefined;
+      //Se buscan usuario y cuenta de pago
+      findUserAndAccount(data.uid, service)
+        .then(res =>{
+          user = res.user;
+          account = res.account;
+
+          if(!user) throw App.err.notFound("User not found");
+          if(!account) throw App.err.notFound("Account for user not found");
+          
+          let PayTransaction = App.db.model('tb.pay-transactions');
+          transaction = new PayTransaction({ 
+            direction: "out",
+            service: service,
+            uid: user ? user._id: undefined,
+            paid: account? account._id: undefined,
+            originalRequest: data,
+            amount: data.amount,
+            currency: data.currency,
+            description: data.description,
+            status: "pending"
+          });
+          return transaction.save();
+        })
+        .then(doc =>{
+          
+          //Comentado para que el estado sea tratado por el servicio
+          // if(account.status != "approved") throw App.err.notAcceptable("Account is not approved");
+
+          return this.adapter.payout({programId: account.programId, payout: doc})
+            .then(res =>{
+              doc.originalResponse = res.response;
+              doc.sTransId = res.payoutId;
+              doc.status = "processing";
+              // doc.data = ???
+            })
+            .catch(ret =>{
+              error = ret.error;
+              doc.originalResponse = ret.response;
+              doc.status = "rejected";//TODO: qué estado hay que poner acá?
+            })
+            .then(res => {return doc.save()});
+        })
+        .then(doc =>{
+          if(!error)
+            resolve(doc)
+          else{
+            reject(error);
+          }
+        })
+        .catch(reject);
+     
+    });
+  }
+
 
   echo(){
     return new Promise((resolve,reject)=>{
@@ -379,6 +478,12 @@ class Client {
     return Client.forService(service)
       .then(client => client.createRegistrationLink(uid, login));
   }
+
+  static payout(service, data){
+    return Client.forService(service)
+      .then(client => client.payout(data));
+  }
+
 
   static echo(service){
     return Client.forService(service)
@@ -501,6 +606,19 @@ function loadConfigOptions(){
    }else{
     resolve(payOptions);
    }
+  });
+}
+
+function findUserAndAccount(uid, service){
+  return new Promise((resolve, reject) => {
+    Promise.all([
+        App.db.model('users').findById(uid),
+        App.db.model('tb.pay-accounts').findOne({uid: uid, service: service})
+      ])
+      .then(res =>{
+        resolve({user: res[0], account: res[1]})
+      })
+      .catch(reject);
   });
 }
 

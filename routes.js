@@ -35,7 +35,7 @@ function setupRoutes(App){
   router.get('/registrationlink/:service/:uid([0-9a-f]{24})', (req, res, next) => {
     let service = req.params.service;
     let uid     = req.params.uid;
-    let login   = req.query.login || false; 
+    let login   = req.query.login == "true"; 
 
     Client.registrationLink(service, uid, login)
       .then(resp => res.status(200).json(resp))
@@ -43,10 +43,17 @@ function setupRoutes(App){
 
   });
 
-  router.get("/ping",function(req, res, next){
-     log.debug("Pay module ping request"); 
-     res.status(200).json("pong")
-  }); 
+
+  // router.post('/payout/:service', (req, res, next) => {
+  //   var ctx = req._ctx;
+  //   let service = req.params.service;
+  //   let payload = ctx.payload;
+
+  //   Client.payout(service, payload)
+  //     .then(resp => res.status(200).json(resp))
+  //     .catch(next);
+
+  // });
 
   router.get("/echo/:service/",function(req, res, next){
     let service = req.params.service;
