@@ -28,9 +28,10 @@ let schema  = new Schema ({
   originalRequest:  { type: Schema.Types.Mixed },  // optional: original request made by client when creating the account
   status:           { type: String, enum: utils.accountStatusList, default: 'pending' },
   // auto-fill:
-  statusLog: [ new Schema ({    // status change logging
-    status:         { type: String }
-  }, { _id: false, timestamps: { createdAt: 'cDate' } })],
+  statusLog: [ new Schema({
+    status: { type: String, required: true },
+    cDate:  { type: Date, default: Date.now }
+  }, { _id: false })],
   // on response or hooks:
   sUserId:          { type: String }, // service user id (internal reference from <service> service)
   originalResponse: { type: Schema.Types.Mixed },  // optional: original response received by client when creating the account

@@ -43,18 +43,6 @@ function setupRoutes(App){
 
   });
 
-
-  // router.post('/payout/:service', (req, res, next) => {
-  //   var ctx = req._ctx;
-  //   let service = req.params.service;
-  //   let payload = ctx.payload;
-
-  //   Client.payout(service, payload)
-  //     .then(resp => res.status(200).json(resp))
-  //     .catch(next);
-
-  // });
-
   router.get("/echo/:service/",function(req, res, next){
     let service = req.params.service;
     Client.echo(service)

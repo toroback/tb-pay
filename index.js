@@ -91,6 +91,7 @@ class Client {
       let ret = {}
       this.adapter.processWebhook(data)
         .then(res =>{
+          log.debug("processed webhook in service "+ JSON.stringify(res));
           ret.ref = res.ref;
           let docData = res.data;
           if(res.ref == "account"){
@@ -115,31 +116,7 @@ class Client {
                 ret.err = err; 
                 reject(ret);
               });
-              // .catch(err => reject(ret));
-
-           //  PayAccount.findOne({uid: uid, service: service}, (err,account) =>{
-           //    if(err) reject(err)
-           //    else{
-
-           //      if(!account) account = new PayAccount({service: service, uid: uid, status: "pending"});
-                
-           //      account.status = docData.status;
-           //      account.sUserId = docData.sUserId;
-           //      account.originalResponse = data;
-           //      account.save()
-           //        .then(doc => { 
-           //          ret.rid = doc._id;
-           //          resolve(ret);
-           //        })
-           //        .catch(err => { 
-           //          ret.err = err; 
-           //          reject(ret);
-           //        })
-           //        // .then(res =>{ resolve(ret); });
-           //    }
-           // });
-
-
+    
           }else if(res.ref == "transaction"){
 
             let uid = docData.uid;
@@ -175,6 +152,9 @@ class Client {
                 }
               }
             });
+          }else{
+            resolve(ret)
+            // throw App.err.notAcceptable("Unhlanded webhook type");
           }
         })
         .catch(err => { 
@@ -325,6 +305,13 @@ class Client {
           if(!user) throw App.err.notFound("User not found");
           if(!account) throw App.err.notFound("Account for user not found");
           
+          let program = getProgram(service, account.programId);
+          let defaultCurrency = program ? program.currency : undefined;
+          // let currency = data.currency
+          // let config = getServiceConfig(this.service);
+          // if(config && config.programs && config.programs[0]){
+          //   defaultCurrency = config.programs[0].currency ;
+
           let PayTransaction = App.db.model('tb.pay-transactions');
           transaction = new PayTransaction({ 
             direction: "out",
@@ -333,7 +320,7 @@ class Client {
             paid: account? account._id: undefined,
             originalRequest: data,
             amount: data.amount,
-            currency: data.currency,
+            currency: data.currency || defaultCurrency,
             description: data.description,
             status: "pending"
           });
@@ -553,6 +540,22 @@ function loadServiceAdapter(service){
   });
 }
 
+function getProgram(service, id){
+  let config = getServiceConfig(service);
+  let program = undefined;
+  if(config && config.programs){
+    program = config.programs[0];
+
+    config.programs.forEach(p =>{
+      if(p.id == id){
+        program = p;
+      }
+    });
+
+    return program;
+  }
+}
+
 function setupExports(){
   return new Promise((resolve, reject) => {
     let utils = require("./lib/utils");
@@ -648,12 +651,12 @@ Client.post("echo", function(service, res,  next){
 });
 
 
-Client.prototype.post("prepareRegistrationLinkPayload", function(data, res,  next){
-  console.log("prepareRegistrationLinkPayload post hook data" + JSON.stringify(data));
-  console.log("prepareRegistrationLinkPayload post hook res" + JSON.stringify(res));
-  // res.payee = {type: "INDIVIDUAL"};
-  // res.payee.contact = {firstName: data.user.name};
-  next(res);
-});
+// Client.prototype.post("prepareRegistrationLinkPayload", function(data, res,  next){
+//   console.log("prepareRegistrationLinkPayload post hook data" + JSON.stringify(data));
+//   console.log("prepareRegistrationLinkPayload post hook res" + JSON.stringify(res));
+//   // res.payee = {type: "INDIVIDUAL"};
+//   // res.payee.contact = {firstName: data.user.name};
+//   next(res);
+// });
 
 

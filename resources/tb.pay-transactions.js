@@ -7,7 +7,7 @@ var helper   = require("../helpers/tb.pay-transactions");
 
 /** 
  * Modelo de datos que contiene información sobre una cuenta de pago
- * @class PayAccountSchema
+ * @class PayTransactionSchema
  * @memberOf module:tb-pay
  * @property {String}   direction Transaction direction: incoming or outgoing
  * @property {String}   service Service type (payoneer, paypal, etc...)
@@ -36,9 +36,10 @@ let schema  = new Schema ({
   originalRequest:  { type: Schema.Types.Mixed },  // optional: original request made by client when creating the account
   status:           { type: String, enum: utils.transactionStatusList, default: 'pending' },
   // auto-fill:
-  statusLog: [ new Schema ({    // status change logging
-    status:         { type: String }
-  }, { _id: false, timestamps: { createdAt: 'cDate' } }) ],
+  statusLog: [ new Schema({
+    status: { type: String, required: true },
+    cDate:  { type: Date, default: Date.now }
+  }, { _id: false }) ],
   // on response or hooks:
   sTransId:         { type: String }, // service transaction id (internal reference from <service> service)
   originalResponse: { type: Schema.Types.Mixed },  // optional: original response received by client when creating the account
