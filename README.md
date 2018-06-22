@@ -111,7 +111,7 @@ App.pay.createRegistrationLink(service, uid, forLogin)
 
 ```
 {
-  "url": "https://payouts.sandbox.payoneer.com/partners/lp.aspx?token=6b9d1d799974496239438e81aee28ea2329BCC0A38"
+  "url": "https://payouts.sandbox.payoneer.com/partners/lp.aspx?token=6b8d1e788973496239438e81aee28ea4329DCC0A38"
 }
 ```
 
@@ -227,13 +227,5 @@ App.pay.forService(service)
 App.pay.payout(service, data)
   .then(resp => console.log(resp))
   .catch(err => console.log(err));
-```
-
-**Ejemplo Respuesta:**
-
-```
-{
-  "url": "https://payouts.sandbox.payoneer.com/partners/lp.aspx?token=6b9d1d799974496239438e81aee28ea2329BCC0A38"
-}
 ```
 
