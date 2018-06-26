@@ -69,7 +69,42 @@ Un ejemplo de configuración del servicio *Payoneer* sería el siguiente:
 
 #### **• REST Api:**
 
-Por documentar.
+**Petición:**
+
+|HTTP Method|URL|
+|:---:|:---|
+|GET| `https://[domain]:[port]/api/v[apiVersion]/srv/pay/registrationlink/:service/:uid?login=<forLogin>`|
+
+**Parámetros en la ruta:**
+
+| Clave | Tipo | Opcional   | Descripción  |
+|---|---|:---:|---|
+|service|String||Servicio de pago a utilizar (valores: payoneer)|
+|uid|String||Id del usuario para el que se va a pedir el link|
+
+**Parámetros del query:**
+
+| Clave | Tipo | Opcional   | Descripción  |
+|---|---|:---:|---|
+|login|boolean|X|`true` para indicar que el link será para realizar login. Por defecto es `false`|
+
+**Respuesta:**
+
+| Clave | Tipo | Opcional | Descripción |
+|---|---|:---:|---|
+|url|String||La url solicidata|
+
+**Ejemplo:**
+
+GET: `https://a2server.a2system.net:1234/api/v1/srv/pay/registrationlink/payoneer/58ad3fe33e13466beefe91e2`
+
+* RESPUESTA: 
+
+```javascript
+  {
+    "url": "https://payouts.sandbox.payoneer.com/partners/lp.aspx?token=6b8d1e788973496239438e81aee28ea4329DCC0A38"
+  }
+```
 
 #### **• Código Javascript:**
 
@@ -79,7 +114,7 @@ Por documentar.
 |---|---|:---:|---|
 |service|String||Identificador del servicio a utilizar (Ej: "payoneer")|
 |uid|String||Identificador del usuario para el que se pedirá el link| 
-|forLogin|Boolean||Flag que indica si el link será pedido para realizar login o registro|
+|forLogin|Boolean||Flag que indica si el link será pedido para realizar login o registro. Por defecto es `false`|
 
 **Respuesta:**
 
@@ -92,7 +127,7 @@ Por documentar.
 ```javascript
 var service = "payoneer";
 
-var forLogin = "true"; //Se pide link para login. false si se quiere para registro
+var forLogin = true; //Se pide link para login. false si se quiere para registro
 var uid = <myUserId> //Identificador del usuario para el que se pide el link
 
 //Opcion 1 : obteniendo un objeto cliente para el servicio.
@@ -198,7 +233,7 @@ No disponible.
 |data.uid|String||Identificador del usuario al que se le realizará el pago| 
 |data.amount|String||Cantidad que se va a pagar|
 |data.description|String|X|Descripción del pago|
-|data.currency|String|X|Moneda en la que se realiza el pago. Si no se pasa se toma la moneda asociada al programa de la cuenta del usuario|
+|data.currency|String||Moneda en la que se realiza el pago. ISO-4217 (alpha 3 currency)|
 
 **Respuesta:**
 
@@ -213,6 +248,7 @@ var service = "payoneer";
 
 var data = {
   "amount":"20.00",
+  "currency": "USD",
   "description": "Test payout",
   "uid":<theUserId>
 }

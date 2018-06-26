@@ -172,14 +172,8 @@ class Client {
       // let PayAccount = App.db.model('tb.pay-accounts');
       //Se busca usuario y cuenta asociada al usuario para el servicio
 
-      // Promise.all([
-      //    App.db.model('users').findById(uid),
-      //    PayAccount.findOne({uid: uid, service: service})
-      //   ])
       findUserAndAccount(uid, service)
         .then(res =>{
-          // let user = res[0];
-          // let account = res[1];
           let user = res.user;
           let account = res.account;
 
@@ -191,31 +185,21 @@ class Client {
               account:{
                 uid: account.uid,
                 service: account.service,
-                programId: account.programId,
                 status: account.status
               }
             });
 
           }else{
-            //Si no existe cuenta o no está aprovada se pedirá el link al servicio
+            //Si no existe cuenta o no está aprobada se pedirá el link al servicio
             let linkUrl = undefined;
-            let programId = account ? account.programId : undefined;
-          
-            if(!programId){
-              let config = getServiceConfig(service);
-              if(config && config.programs && config.programs[0]){
-                programId = config.programs[0].id;
-              }else{
-                reject(App.err.notFound("No programId found for "+ service));
-              }
-            }
 
-            this.requestLink(user, programId, forLogin)
+            this.requestLink(user, account, forLogin)
               .then(res => {
                 linkUrl = res.response.link;
-          
-                if(!account) account = new App.db.model('tb.pay-accounts')({service: service, uid: user._id, originalRequest: res.request, originalResponse: res.response, programId: programId});
-                if(!account.programId) account.programId = programId;
+                
+                if(!account) account = new App.db.model('tb.pay-accounts')({service: service, uid: user._id, originalRequest: res.request, originalResponse: res.response});
+                if(!account.data) account.data = {};
+                Object.assign(account.data, res.response.data); //Se asigna la información específica del servicio
 
                 account.status = "pending";
                 
@@ -233,15 +217,13 @@ class Client {
     });
   }
 
-  //TODO: acá se podría pasar un objeto que tenga todo lo que se va a usar en la funcion interior:
-  //que tenga, payload, forLogin y programId
-  requestLink(user, programId, forLogin){
+  requestLink(user, account, forLogin){
     return new Promise((resolve,reject)=>{
       let payload = undefined;
-      this.prepareRequestLinkPayload({service: this.service, user: user, programId: programId, forLogin: forLogin})
+      this.prepareRequestLinkPayload({service: this.service, user: user, account: account, forLogin: forLogin})
         .then(res =>{
           payload = res;
-          return  this.adapter.createRegistrationLink({forLogin: forLogin, programId: programId, payload: payload})
+          return  this.adapter.createRegistrationLink({forLogin: forLogin, account: account, payload: payload})
         })
         .then(res =>{
           log.debug("requestLink -" + JSON.stringify(res));
@@ -260,7 +242,7 @@ class Client {
    * @param  {[type]} data      [description]
    * @param  {[type]} data.service   [description]
    * @param  {[type]} data.user      [description]
-   * @param  {[type]} data.programId [description]
+   * @param  {[type]} data.account   [description]
    * @param  {[type]} data.forLogin  [description]
    * @return {[type]}           [description]
    */
@@ -304,13 +286,6 @@ class Client {
 
           if(!user) throw App.err.notFound("User not found");
           if(!account) throw App.err.notFound("Account for user not found");
-          
-          let program = getProgram(service, account.programId);
-          let defaultCurrency = program ? program.currency : undefined;
-          // let currency = data.currency
-          // let config = getServiceConfig(this.service);
-          // if(config && config.programs && config.programs[0]){
-          //   defaultCurrency = config.programs[0].currency ;
 
           let PayTransaction = App.db.model('tb.pay-transactions');
           transaction = new PayTransaction({ 
@@ -320,7 +295,7 @@ class Client {
             paid: account? account._id: undefined,
             originalRequest: data,
             amount: data.amount,
-            currency: data.currency || defaultCurrency,
+            currency: data.currency,
             description: data.description,
             status: "pending"
           });
@@ -331,17 +306,18 @@ class Client {
           //Comentado para que el estado sea tratado por el servicio
           // if(account.status != "approved") throw App.err.notAcceptable("Account is not approved");
 
-          return this.adapter.payout({programId: account.programId, payout: doc})
+          return this.adapter.payout({account: account, payout: doc})
             .then(res =>{
               doc.originalResponse = res.response;
               doc.sTransId = res.payoutId;
               doc.status = "processing";
-              // doc.data = ???
+              if(res.data) doc.data = res.data; //se le asignan los datos específicos del servicio
             })
             .catch(ret =>{
               error = ret.error;
               doc.originalResponse = ret.response;
-              doc.status = "rejected";//TODO: qué estado hay que poner acá?
+              doc.status = "rejected";
+              if(ret.data) doc.data = ret.data; //se le asignan los datos específicos del servicio
             })
             .then(res => {return doc.save()});
         })
@@ -360,31 +336,14 @@ class Client {
 
   echo(){
     return new Promise((resolve,reject)=>{
-      let config = getServiceConfig(this.service);
-      if(config && config.programs && config.programs[0]){
-        this.adapter.echo({programId:config.programs[0].id})   
-          .then(res =>{
-            log.debug("echo -" + JSON.stringify(res));
-            resolve(res);
-          })
-          .catch(reject)
-      }else{
-        reject(App.err.notFound("No programId found for "+ this.service));
-      } 
-
-      // loadServiceConfig(this.service)
-      //   .then(config =>{
-      //     if(config && config.programs && config.programs[0]){
-      //       return this.adapter.echo({programId:config.programs[0].id})   
-      //     }else{
-      //       reject("No programIf found for "+ this.service);
-      //     } 
-      //   })
-      //   .then(res =>{
-      //     log.debug("echo -" + JSON.stringify(res));
-      //     resolve(res);
-      //   })
-      //   .catch(reject);
+  
+      this.adapter.echo()   
+        .then(res =>{
+          log.debug("echo -" + JSON.stringify(res));
+          resolve(res);
+        })
+        .catch(reject)
+  
     });
   }
 
@@ -540,21 +499,21 @@ function loadServiceAdapter(service){
   });
 }
 
-function getProgram(service, id){
-  let config = getServiceConfig(service);
-  let program = undefined;
-  if(config && config.programs){
-    program = config.programs[0];
+// function getProgram(service, id){
+//   let config = getServiceConfig(service);
+//   let program = undefined;
+//   if(config && config.programs){
+//     program = config.programs[0];
 
-    config.programs.forEach(p =>{
-      if(p.id == id){
-        program = p;
-      }
-    });
+//     config.programs.forEach(p =>{
+//       if(p.id == id){
+//         program = p;
+//       }
+//     });
 
-    return program;
-  }
-}
+//     return program;
+//   }
+// }
 
 function setupExports(){
   return new Promise((resolve, reject) => {
