@@ -220,7 +220,7 @@ class Client {
   requestLink(user, account, forLogin){
     return new Promise((resolve,reject)=>{
       let payload = undefined;
-      this.prepareRequestLinkPayload({service: this.service, user: user, account: account, forLogin: forLogin})
+      Client.prepareRequestLinkPayload({service: this.service, user: user, account: account, forLogin: forLogin})
         .then(res =>{
           payload = res;
           return  this.adapter.createRegistrationLink({forLogin: forLogin, account: account, payload: payload})
@@ -234,33 +234,6 @@ class Client {
         })
         .catch(reject);
       
-    });
-  }
-
-  /**
-   * Prepara la información para solicitar la creación de un link de registro/login
-   * @param  {[type]} data      [description]
-   * @param  {[type]} data.service   [description]
-   * @param  {[type]} data.user      [description]
-   * @param  {[type]} data.account   [description]
-   * @param  {[type]} data.forLogin  [description]
-   * @return {[type]}           [description]
-   */
-  prepareRequestLinkPayload(data){
-    let mobile = data.user.tel && data.user.tel.id ? "+"+data.user.tel.id : undefined;
-    log.debug("Request link payload "+ mobile);
-    return new Promise((resolve,reject)=>{
-      resolve({
-        uid: data.user._id, 
-        payee:{
-          type: "INDIVIDUAL",
-          contact: {
-            firstName: data.user.name,
-            email: data.user.email ? data.user.email.login : undefined,
-            mobile: data.user.tel && data.user.tel.id ? "+"+data.user.tel.id : undefined 
-          }
-        }
-      });
     });
   }
 
@@ -435,7 +408,46 @@ class Client {
     return Client.forService(service)
       .then(client => client.echo());
   }
-     /**
+
+  /**
+   * INFO: Esta funcion se hizo estática para que se le pueda poner un hook de la manera "App.pay.post()" sino seria "App.pay.prototype.post()"
+   * Prepara la información para solicitar la creación de un link de registro/login
+   * @param  {[type]} data      [description]
+   * @param  {[type]} data.service   [description]
+   * @param  {[type]} data.user      [description]
+   * @param  {[type]} data.account   [description]
+   * @param  {[type]} data.forLogin  [description]
+   * @return {[type]}           [description]
+   */
+  static prepareRequestLinkPayload(data){
+    let mobile = data.user.tel && data.user.tel.id ? "+"+data.user.tel.id : undefined;
+    log.debug("Request link payload "+ mobile);
+    return new Promise((resolve,reject)=>{
+      resolve({
+        uid: data.user._id, 
+        payee:{
+          type: "INDIVIDUAL",
+          contact: {
+            firstName: data.user.name,
+            email: data.user.email ? data.user.email.login : undefined,
+            mobile: data.user.tel && data.user.tel.id ? "+"+data.user.tel.id : undefined 
+          }
+        }
+      });
+    });
+  }
+
+  /*
+    Función a la que se le puede añadir un hook para enterarse de que un documento transaction fué modificado
+    Para añadir hook "App.pay.post("transactionUpdated", function(doc){})"
+   */
+  static transactionUpdated(doc){
+    return new Promise((resolve, reject) => {
+      log.debug("transaction updated " + JSON.stringify(doc) );
+      resolve();
+    });
+  }
+  /**
    * Metodo que permite llamar a cualquier otro metodo del modulo comprobando con aterioridad si el usuario tiene permisos para acceder a este.
    * @param {ctx} CTX Contexto donde se indicará el resource y el method a ejecutar
    * @param {Object} CTX.client Aplicación cliente sobre la que se realizará la acción
@@ -585,29 +597,29 @@ function findUserAndAccount(uid, service){
 }
 
 //Esto añade los hooks a las funciones de la clase, es decir, a las estáticas
-Client.hooks = {echo: "promise"};
+Client.hooks = {prepareRequestLinkPayload:"promise", transactionUpdated:"promise"};
 Client.pre = hook.pre;
 Client.post = hook.post;
 
 //Esto añade los hooks a las funcines de las instancias de la clase.
-Client.prototype.hooks = {prepareRequestLinkPayload: "promise"};
-Client.prototype.pre = hook.pre;
-Client.prototype.post = hook.post;
+// Client.prototype.hooks = {prepareRequestLinkPayload: "promise"};
+// Client.prototype.pre = hook.pre;
+// Client.prototype.post = hook.post;
 
 module.exports = Client;
 
 //EJEMPLO de llamada a pre hook. Tiene que hacer un parámetro más que la función a la que se le aplica el hook. Dicho parámetro extra es la función next que hay que llamar
-Client.pre("echo", function(service, next){
-  console.log("echo pre hook called for service " + service);
-  next();
-});
+// Client.pre("echo", function(service, next){
+//   console.log("echo pre hook called for service " + service);
+//   next();
+// });
 
-Client.post("echo", function(service, res,  next){
-  console.log("echo post hook called for service " + service);
-  console.log("echo post hook res" + JSON.stringify(res));
+// Client.post("echo", function(service, res,  next){
+//   console.log("echo post hook called for service " + service);
+//   console.log("echo post hook res" + JSON.stringify(res));
 
-  next();
-});
+//   next();
+// });
 
 
 // Client.prototype.post("prepareRegistrationLinkPayload", function(data, res,  next){

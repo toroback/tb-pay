@@ -154,67 +154,7 @@ App.pay.createRegistrationLink(service, uid, forLogin)
 
 Al solicitar el link de registro/login se puede pasar información adicional para que aparezca autocompletada en la página web. Para ello se puede configurar un hook para modificar los parámetros que se enviarán en la consulta al servicio.
 
-Dicho hook se debe realizar sobre el prototipo del módulo y a la función `"prepareRequestLinkPayload"` y se puede configurar, por ejemplo, en el momento de inicialización del módulo en el archivo `"boot.js"`, de la siguiente manera:
-
-```
-  App.pay.prototype.post("prepareRequestLinkPayload", function(data, res,  next){
-    //...
-    //se modifica el objeto res para añadir/modificar los valores 
-    //...
-    next(res);
-  });
-```
-
-Los parámetros que se pueden enviar en la peticion del link son los siguientes:
-
-| Clave | Tipo | Opcional | Descripción |
-|---|---|:---:|---|
-|uid|String||Identificador del usuario|
-|sessionId|String|X|Identificador de la sesión para la petición|
-|languageId|Number|X|Id de idioma del landing site. Por ahora ver documentacion del servicio|
-|redirectUrl|String|X|Url de redireccionamiento tras registro|
-|redirectTime|String|X|Tiempo entre que se realiza el registro y que el usuario es redirigido|
-|payoutMethods|Array|X|(Solo para link de registro) Lista de metodos disponibles para el registro. Values: ("PREPAID_CARD", "BANK","PAYPAL" and "PAPER_CHECK")|
-|registrationMode|String|X|(Solo para link de registro) “LIMITED” registration mode is supported for accounts that are linked to a local bank account. In this mode, the payee is prompted to fill in minimal details to receive payment. Permitted values: “FULL”, “LIMITED”|
-|lockType|String|X|(Solo para link de registro) Enables locking some or all pre-populated fields from being edited by the payee while he completes registration forms Permitted values: “NONE”, “ALL”, “ADDRESS”, “NAMES”, “EMAIL”, “NAME_ADDRESS_EMAIL”, “DATE_OF_BIRTH”, “ALL_NAMES”, “ALL_NAMES_ADDRESS_EMAIL”|
-|payee|Object|X|(Solo para link de registro) Objeto con la información del receptor del pago|
-|payee.type|String|X|Tipo del receptor (Values: "INDIVIDUAL", "COMPANY")|
-|payee.company|Object|X|Objeto con información de compañia si type es "COMPANY"|
-|payee.company.legalType|String|X|Type of legal entity Permitted values: “PUBLIC”, “PRIVATE”, “SOLE PROPRIETORSHIP”, “LLC”, “LLP”, “NON PROFIT”|
-|payee.company.name|String|X|Nombre de la compañia|
-|payee.company.url|String|X|Link al website de la compañia|
-|payee.company.incorporatedCountry|String|X|País de la compañia|
-|payee.company.incorporatedState|String|X|Estado de la compañia|
-|payee.contact|Object|X|Objeto con información de contacto si type es "INDIVIDUAL"|
-|payee.contact.firstName|String|X|Nombre del contacto|
-|payee.contact.lastName|String|X|Apellido del contacto|
-|payee.contact.email|String|X|Email del contacto|
-|payee.contact.birthDate|String|X|Fecha de nacimiento del contacto (Formato : YYYY-MM-DD)|
-|payee.contact.mobile|String|X|Número de movil del contacto|
-|payee.contact.phone|String|X|Telefono fijo del contacto|
-|payee.address|Object|X|Dirección de la compañia o del contacto|
-|payee.address.country|String|X|Pais|
-|payee.address.state|String|X|Estado|
-|payee.address.addressLine1|String|X|First address line|
-|payee.address.addressLine2|String|X|Second address line|
-|payee.address.city|String|X|Ciudad|
-|payee.address.zipCode|String|X|Código postal|
-
-**EJEMPLO**
-
-El siguiente ejemplo modifica el nombre y el apellido del contacto y añade una dirección
-
-```
-  App.pay.prototype.post("prepareRequestLinkPayload", function(data, res,  next){
-    res.payee.firstName = usersLoadedFirstName;
-    res.payee.lastName = usersLoadedLastName;
-    res.payee.address = {
-      country: "US",
-      state:"NY"
-    }
-    next(res);
-  });
-```
+Ver sección *Hooks -> Modificacion de parámetros de petición de enlace de registro*
 
 ### **- Realizar un pago:**
 
@@ -264,4 +204,104 @@ App.pay.payout(service, data)
   .then(resp => console.log(resp))
   .catch(err => console.log(err));
 ```
+
+## **Hooks**
+
+El módulo dispone de algunas funciones a las que se le puede añadir hooks para modificar la información o para conocer que algún documento cambió. 
+
+Para añadir un hook se basta con configurarlo de la siguiente manera, por ejemplo en la función Boot() del archivo `boot.js`:
+
+```
+  App.pay.post(theHookedFunction, function(...args){
+    //...
+    // manejar hook
+    //...
+  });
+```
+
+A continuación se detallarán las distintas funciones a las que se puede añadir un hook.
+
+### **• Modificacion de parámetros de petición de enlace de registro:**
+
+*NOTA:* Hook relacionado con *Funcionalidades -> Obtener de link de registro/login*
+
+Al solicitar el link de registro/login se puede pasar información adicional para que aparezca autocompletada en la página web. Para ello se puede configurar un hook para modificar los parámetros que se enviarán en la consulta al servicio.
+
+Dicho hook se debe realizar a la función `"prepareRequestLinkPayload"` y se puede configurar, por ejemplo, en el momento de inicialización del módulo en el archivo `"boot.js"`, de la siguiente manera:
+
+
+```
+  App.pay.post("prepareRequestLinkPayload", function(data, res,  next){
+    //...
+    //se modifica el objeto res para añadir/modificar los valores 
+    //...
+    next(res);
+  });
+```
+
+Los parámetros que se pueden enviar en la peticion del link son los siguientes:
+
+| Clave | Tipo | Opcional | Descripción |
+|---|---|:---:|---|
+|uid|String||Identificador del usuario|
+|sessionId|String|X|Identificador de la sesión para la petición|
+|languageId|Number|X|Id de idioma del landing site. Por ahora ver documentacion del servicio|
+|redirectUrl|String|X|Url de redireccionamiento tras registro|
+|redirectTime|String|X|Tiempo entre que se realiza el registro y que el usuario es redirigido|
+|payoutMethods|Array|X|(Solo para link de registro) Lista de metodos disponibles para el registro. Values: ("PREPAID_CARD", "BANK","PAYPAL" and "PAPER_CHECK")|
+|registrationMode|String|X|(Solo para link de registro) “LIMITED” registration mode is supported for accounts that are linked to a local bank account. In this mode, the payee is prompted to fill in minimal details to receive payment. Permitted values: “FULL”, “LIMITED”|
+|lockType|String|X|(Solo para link de registro) Enables locking some or all pre-populated fields from being edited by the payee while he completes registration forms Permitted values: “NONE”, “ALL”, “ADDRESS”, “NAMES”, “EMAIL”, “NAME_ADDRESS_EMAIL”, “DATE_OF_BIRTH”, “ALL_NAMES”, “ALL_NAMES_ADDRESS_EMAIL”|
+|payee|Object|X|(Solo para link de registro) Objeto con la información del receptor del pago|
+|payee.type|String|X|Tipo del receptor (Values: "INDIVIDUAL", "COMPANY")|
+|payee.company|Object|X|Objeto con información de compañia si type es "COMPANY"|
+|payee.company.legalType|String|X|Type of legal entity Permitted values: “PUBLIC”, “PRIVATE”, “SOLE PROPRIETORSHIP”, “LLC”, “LLP”, “NON PROFIT”|
+|payee.company.name|String|X|Nombre de la compañia|
+|payee.company.url|String|X|Link al website de la compañia|
+|payee.company.incorporatedCountry|String|X|País de la compañia|
+|payee.company.incorporatedState|String|X|Estado de la compañia|
+|payee.contact|Object|X|Objeto con información de contacto si type es "INDIVIDUAL"|
+|payee.contact.firstName|String|X|Nombre del contacto|
+|payee.contact.lastName|String|X|Apellido del contacto|
+|payee.contact.email|String|X|Email del contacto|
+|payee.contact.birthDate|String|X|Fecha de nacimiento del contacto (Formato : YYYY-MM-DD)|
+|payee.contact.mobile|String|X|Número de movil del contacto|
+|payee.contact.phone|String|X|Telefono fijo del contacto|
+|payee.address|Object|X|Dirección de la compañia o del contacto|
+|payee.address.country|String|X|Pais|
+|payee.address.state|String|X|Estado|
+|payee.address.addressLine1|String|X|First address line|
+|payee.address.addressLine2|String|X|Second address line|
+|payee.address.city|String|X|Ciudad|
+|payee.address.zipCode|String|X|Código postal|
+
+**EJEMPLO**
+
+El siguiente ejemplo modifica el nombre y el apellido del contacto y añade una dirección
+
+```
+  App.pay.post("prepareRequestLinkPayload", function(data, res,  next){
+    res.payee.firstName = usersLoadedFirstName;
+    res.payee.lastName = usersLoadedLastName;
+    res.payee.address = {
+      country: "US",
+      state:"NY"
+    }
+    next(res);
+  });
+```
+
+### **• Evento de modificación de un objeto tb.pay-transaction:**
+
+Para recibir un evento cada vez que sea actualizado un objeto 'tb.pay-transaction' basta con añadir un hook. 
+
+Dicho hook se debe realizar a la función `transactionUpdated` y se puede configurar, por ejemplo, en el momento de inicialización del módulo en el archivo `"boot.js"`, de la siguiente manera:
+
+```
+  App.pay.post("transactionUpdated", function(doc){
+    //...
+    //Manejar evento de transacción modificada
+    //...
+  });
+```
+
 

@@ -47,6 +47,9 @@ function preSaveHook(doc) {
 // post save
 function postSaveHook(doc) {
    return new Promise( (resolve, reject) => {
+    //Se añade un hook para que el programador que use el modulo se pueda enterar que cambió una transacción
+    require("../index").transactionUpdated(doc);
+
     resolve();
   });
 }

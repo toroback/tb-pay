@@ -61,12 +61,12 @@ schema.virtual('user', { ref: 'a2s.user', localField: 'uid', foreignField: '_id'
 schema.virtual('account', { ref: 'tb.pay-accounts', localField: 'paid', foreignField: '_id', justOne: true });
 
 //hooks  
-schema.pre('validate', function(next, ctx) {  // this can NOT be an arrow function
-  console.log('========>>> HOOK: pre validate (tb.pay-transactions)');
-  helper.preValidateHook(this)
-    .then(next)
-    .catch(next);
-});
+// schema.pre('validate', function(next, ctx) {  // this can NOT be an arrow function
+//   console.log('========>>> HOOK: pre validate (tb.pay-transactions)');
+//   helper.preValidateHook(this)
+//     .then(next)
+//     .catch(next);
+// });
 
 schema.pre('save', function(next, ctx) {  // this can NOT be an arrow function
   console.log('========>>> HOOK: pre save (tb.pay-transactions)');

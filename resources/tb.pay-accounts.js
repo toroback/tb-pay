@@ -51,12 +51,12 @@ schema.virtual('user', { ref: 'a2s.user', localField: 'uid', foreignField: '_id'
 
 
 //hooks  
-schema.pre('validate', function(next, ctx) {  // this can NOT be an arrow function
-  console.log('========>>> HOOK: pre validate (tb.pay-accounts)');
-  helper.preValidateHook(this)
-    .then(next)
-    .catch(next);
-});
+// schema.pre('validate', function(next, ctx) {  // this can NOT be an arrow function
+//   console.log('========>>> HOOK: pre validate (tb.pay-accounts)');
+//   helper.preValidateHook(this)
+//     .then(next)
+//     .catch(next);
+// });
 
 schema.pre('save', function(next, ctx) {  // this can NOT be an arrow function
   console.log('========>>> HOOK: pre save (tb.pay-accounts)');
@@ -65,10 +65,10 @@ schema.pre('save', function(next, ctx) {  // this can NOT be an arrow function
     .catch(next);
 });
 
-schema.post('save', function(doc) {  // this can NOT be an arrow function
-  console.log('========>>> HOOK: post save (tb.pay-accounts)');
-  helper.postSaveHook(doc);
-});
+// schema.post('save', function(doc) {  // this can NOT be an arrow function
+//   console.log('========>>> HOOK: post save (tb.pay-accounts)');
+//   helper.postSaveHook(doc);
+// });
 
 
 
