@@ -166,7 +166,7 @@ class Client {
     });
   }
 
-  createRegistrationLink(uid, forLogin){
+  createRegistrationLink(uid, data, forLogin){
     return new Promise((resolve,reject)=>{
       let service = this.service;
       // let PayAccount = App.db.model('tb.pay-accounts');
@@ -193,15 +193,17 @@ class Client {
             //Si no existe cuenta o no está aprobada se pedirá el link al servicio
             let linkUrl = undefined;
 
-            this.requestLink(user, account, forLogin)
+            this.requestLink(user, account, data, forLogin)
               .then(res => {
                 linkUrl = res.response.link;
                 
-                if(!account) account = new App.db.model('tb.pay-accounts')({service: service, uid: user._id, originalRequest: res.request, originalResponse: res.response});
+                if(!account) account = new App.db.model('tb.pay-accounts')({service: service, uid: user._id});
                 if(!account.data) account.data = {};
                 Object.assign(account.data, res.response.data); //Se asigna la información específica del servicio
 
                 account.status = "pending";
+                account.originalRequest = res.request;
+                account.originalResponse = res.response;
                 
                 if(account._id) account.uDate = new Date();
 
@@ -217,10 +219,10 @@ class Client {
     });
   }
 
-  requestLink(user, account, forLogin){
+  requestLink(user, account, data, forLogin){
     return new Promise((resolve,reject)=>{
       let payload = undefined;
-      Client.prepareRequestLinkPayload({service: this.service, user: user, account: account, forLogin: forLogin})
+      Client.prepareRequestLinkPayload({service: this.service, user: user, account: account, data: data, forLogin: forLogin})
         .then(res =>{
           payload = res;
           return  this.adapter.createRegistrationLink({forLogin: forLogin, account: account, payload: payload})
@@ -295,11 +297,11 @@ class Client {
             .then(res => {return doc.save()});
         })
         .then(doc =>{
-          if(!error)
+          // if(!error)
             resolve(doc)
-          else{
-            reject(error);
-          }
+          // else{
+          //   reject(error);
+          // }
         })
         .catch(reject);
      
@@ -393,9 +395,9 @@ class Client {
       .then(client => client.confirm(data));
   }
 
-  static registrationLink(service, uid, login){
+  static registrationLink(service, uid, redirectUrl, login){
     return Client.forService(service)
-      .then(client => client.createRegistrationLink(uid, login));
+      .then(client => client.createRegistrationLink(uid, redirectUrl, login));
   }
 
   static payout(service, data){
@@ -420,20 +422,25 @@ class Client {
    * @return {[type]}           [description]
    */
   static prepareRequestLinkPayload(data){
-    let mobile = data.user.tel && data.user.tel.id ? "+"+data.user.tel.id : undefined;
-    log.debug("Request link payload "+ mobile);
+    // let mobile = data.user.tel && data.user.tel.id ? "+"+data.user.tel.id : undefined;
+    // log.debug("Request link payload "+ mobile);
     return new Promise((resolve,reject)=>{
-      resolve({
+      var payload = {
         uid: data.user._id, 
         payee:{
           type: "INDIVIDUAL",
           contact: {
-            firstName: data.user.name,
-            email: data.user.email ? data.user.email.login : undefined,
-            mobile: data.user.tel && data.user.tel.id ? "+"+data.user.tel.id : undefined 
+            firstName: data.user.name
+            // email: data.user.email ? data.user.email.login : undefined,
+            // mobile: data.user.tel && data.user.tel.id ? "+"+data.user.tel.id : undefined 
           }
         }
-      });
+      }
+      if(data.user.email) payload.payee.contact.email = data.user.email.login;
+      if(data.user.tel && data.user.tel.id) payload.payee.contact.mobile =  "+"+data.user.tel.id;
+      if(data.data.redirectUrl) payload.redirectUrl = data.data.redirectUrl;
+      if(data.data.redirectTime) payload.redirectTime = data.data.redirectTime;
+      resolve(payload);
     });
   }
 

@@ -33,15 +33,23 @@ function setupRoutes(App){
   }); 
 
   router.get('/registrationlink/:service/:uid([0-9a-f]{24})', (req, res, next) => {
-    let service = req.params.service;
-    let uid     = req.params.uid;
-    let login   = req.query.login == "true"; 
+    let service     = req.params.service;
+    let uid         = req.params.uid;
+    let login       = req.query.login == "true"; 
+    let redirectUrl = req.query.redirectUrl;
+    let redirectTime = req.query.redirectTime;
 
-    Client.registrationLink(service, uid, login)
+    let data = {
+      redirectUrl: redirectUrl,
+      redirectTime: redirectTime
+    }
+    // Client.registrationLink(service, uid, redirectUrl, login)
+    Client.registrationLink(service, uid, data, login)
       .then(resp => res.status(200).json(resp))
       .catch(next);
 
   });
+
 
   router.get("/echo/:service/",function(req, res, next){
     let service = req.params.service;

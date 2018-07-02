@@ -87,6 +87,8 @@ Un ejemplo de configuración del servicio *Payoneer* sería el siguiente:
 | Clave | Tipo | Opcional   | Descripción  |
 |---|---|:---:|---|
 |login|boolean|X|`true` para indicar que el link será para realizar login. Por defecto es `false`|
+|redirectUrl|String|X|Url de redirección tras registrarse en el servicio|
+|redirectTime|Number|X|Tiempo entre que se realiza el registro y el redirect. En segundos. Default es 10 segundos|
 
 **Respuesta:**
 
@@ -96,7 +98,7 @@ Un ejemplo de configuración del servicio *Payoneer* sería el siguiente:
 
 **Ejemplo:**
 
-GET: `https://a2server.a2system.net:1234/api/v1/srv/pay/registrationlink/payoneer/58ad3fe33e13466beefe91e2`
+GET: `https://a2server.a2system.net:1234/api/v1/srv/pay/registrationlink/payoneer/58ad3fe33e13466beefe91e2?login=false&redirectUrl=www.google.com`
 
 * RESPUESTA: 
 
@@ -115,6 +117,8 @@ GET: `https://a2server.a2system.net:1234/api/v1/srv/pay/registrationlink/payonee
 |service|String||Identificador del servicio a utilizar (Ej: "payoneer")|
 |uid|String||Identificador del usuario para el que se pedirá el link| 
 |forLogin|Boolean||Flag que indica si el link será pedido para realizar login o registro. Por defecto es `false`|
+|redirectUrl|String|X|Url de redirección tras registrarse en el servicio|
+|redirectTime|Number|X|Tiempo entre que se realiza el registro y el redirect. En segundos. Default es 10 segundos|
 
 **Respuesta:**
 
@@ -130,14 +134,20 @@ var service = "payoneer";
 var forLogin = true; //Se pide link para login. false si se quiere para registro
 var uid = <myUserId> //Identificador del usuario para el que se pide el link
 
+//Datos opcionales 
+let data = {
+  redirectUrl: <myRedirectUrl>,
+  redirectTime: <myRedirectTimeInSeconds>
+}
+
 //Opcion 1 : obteniendo un objeto cliente para el servicio.
 App.pay.forService(service)
-  .then(client => client.createRegistrationLink(uid, forLogin));
+  .then(client => client.createRegistrationLink(uid, data, forLogin));
   .then(resp => console.log(resp))
   .catch(err => console.log(err));
 
 //Opcion 2 : Sin obtener instancia del cliente del servicio. (Se instancia internamente)
-App.pay.createRegistrationLink(service, uid, forLogin)
+App.pay.createRegistrationLink(service, uid, data, forLogin)
   .then(resp => console.log(resp))
   .catch(err => console.log(err));
 ```
@@ -280,8 +290,8 @@ El siguiente ejemplo modifica el nombre y el apellido del contacto y añade una 
 
 ```
   App.pay.post("prepareRequestLinkPayload", function(data, res,  next){
-    res.payee.firstName = usersLoadedFirstName;
-    res.payee.lastName = usersLoadedLastName;
+    res.payee.contact.firstName = usersLoadedFirstName;
+    res.payee.contact.lastName = usersLoadedLastName;
     res.payee.address = {
       country: "US",
       state:"NY"
