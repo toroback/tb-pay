@@ -215,6 +215,142 @@ App.pay.payout(service, data)
   .catch(err => console.log(err));
 ```
 
+### **- Obtener balance del servicio:**
+
+#### **• REST Api:**
+
+**Petición:**
+
+|HTTP Method|URL|
+|:---:|:---|
+|GET| `https://[domain]:[port]/api/v[apiVersion]/srv/pay/balance/:service`|
+
+**Parámetros en la ruta:**
+
+| Clave | Tipo | Opcional   | Descripción  |
+|---|---|:---:|---|
+|service|String||Servicio de pago a utilizar (valores: payoneer)|
+
+**Parámetros del query:**
+
+| Clave | Tipo | Opcional   | Descripción  |
+|---|---|:---:|---|
+|programId|String||Solo para Payoneer. Identificador del programa para el que se quiere obtener el balance|
+
+**Respuesta:**
+
+| Clave | Tipo | Opcional | Descripción |
+|---|---|:---:|---|
+|service|String||Servicio para el que se pidió el balance|
+|balance|Object||Objeto con la informacion del balance|
+|balance.amount|Number||Cantitad del balance|
+|balance.currency|String||Moneda del balance|
+|data|Object||Objeto con información específica para cada servicio|
+
+**Ejemplo:**
+
+GET: `https://a2server.a2system.net:1234/api/v1/srv/pay/balance/payoneer?programId=123456789`
+
+* RESPUESTA: 
+
+```javascript
+  {
+  "data": {
+    "audit_id": 42874167,
+    "code": 0,
+    "description": "Success",
+    "balance": 19669.36,
+    "currency": "USD",
+    "fees_due": 0,
+    "programId": "123456789"
+  },
+  "balance": {
+    "amount": 19669.36,
+    "currency": "USD"
+  },
+  "service": "payoneer"
+}
+```
+
+#### **• Código Javascript:**
+
+**Parámetros:**
+
+| Clave | Tipo | Opcional   | Descripción  |
+|---|---|:---:|---|
+|service|String||Identificador del servicio a utilizar (Ej: "payoneer")|
+|data|Object||Información del pago que se va a realizar|
+|data.programId|String||Solo para Payoneer. Identificador del programa para el que se quiere obtener el balance| 
+
+**Respuesta:**
+
+| Clave | Tipo | Opcional | Descripción |
+|---|---|:---:|---|
+|service|String||Servicio para el que se pidió el balance|
+|balance|Object||Objeto con la informacion del balance|
+|balance.amount|Number||Cantitad del balance|
+|balance.currency|String||Moneda del balance|
+|data|Object||Objeto con información específica para cada servicio|
+
+
+{
+  "data": {
+    "audit_id": 42875167,
+    "code": 0,
+    "description": "Success",
+    "balance": 19669.36,
+    "currency": "USD",
+    "fees_due": 0,
+    "programId": "100094640"
+  },
+  "balance": {
+    "amount": 19669.36,
+    "currency": "USD"
+  },
+  "service": "payoneer"
+}
+**Ejemplo:**
+
+```javascript
+var service = "payoneer";
+
+var data = {
+  "programId":"123456789"
+}
+
+//Opcion 1 : obteniendo un objeto cliente para el servicio.
+App.pay.forService(service)
+  .then(client => client.getBalance(data));
+  .then(resp => console.log(resp))
+  .catch(err => console.log(err));
+
+//Opcion 2 : Sin obtener instancia del cliente del servicio. (Se instancia internamente)
+App.pay.getBalance(service, data)
+  .then(resp => console.log(resp))
+  .catch(err => console.log(err));
+```
+
+* RESPUESTA: 
+
+```javascript
+  {
+  "data": {
+    "audit_id": 42874167,
+    "code": 0,
+    "description": "Success",
+    "balance": 19669.36,
+    "currency": "USD",
+    "fees_due": 0,
+    "programId": "123456789"
+  },
+  "balance": {
+    "amount": 19669.36,
+    "currency": "USD"
+  },
+  "service": "payoneer"
+}
+```
+
 ## **Hooks**
 
 El módulo dispone de algunas funciones a las que se le puede añadir hooks para modificar la información o para conocer que algún documento cambió. 

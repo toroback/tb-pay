@@ -32,6 +32,7 @@ function setupRoutes(App){
       .catch(next);
   }); 
 
+
   router.get('/registrationlink/:service/:uid([0-9a-f]{24})', (req, res, next) => {
     let service     = req.params.service;
     let uid         = req.params.uid;
@@ -45,6 +46,17 @@ function setupRoutes(App){
     }
     // Client.registrationLink(service, uid, redirectUrl, login)
     Client.registrationLink(service, uid, data, login)
+      .then(resp => res.status(200).json(resp))
+      .catch(next);
+
+  });
+
+  router.get('/balance/:service', (req, res, next) => {
+    let service  = req.params.service;
+    let data     = req.query;
+
+    // Client.registrationLink(service, uid, redirectUrl, login)
+    Client.getBalance(service, data)
       .then(resp => res.status(200).json(resp))
       .catch(next);
 

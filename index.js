@@ -178,7 +178,6 @@ class Client {
           let account = res.account;
 
           if(!user) throw App.err.notFound("user not foud");
-
           if(account && account.status == "approved"){
             //Si existe cuenta y está aprovada se devuelve la cuenta
             resolve({
@@ -308,6 +307,17 @@ class Client {
     });
   }
 
+  getBalance(data){
+    return new Promise((resolve,reject)=>{
+        return this.adapter.getBalance(data)
+          .then(res => {
+            log.debug("getBalance status debug " + JSON.stringify(res));
+            res.service = this.service; //Se le añade el servicio a la respuesta
+            resolve(res);
+          })
+          .catch(reject);
+    });
+  }
 
   echo(){
     return new Promise((resolve,reject)=>{
@@ -395,9 +405,14 @@ class Client {
       .then(client => client.confirm(data));
   }
 
-  static registrationLink(service, uid, redirectUrl, login){
+  static registrationLink(service, uid, data, login){
     return Client.forService(service)
-      .then(client => client.createRegistrationLink(uid, redirectUrl, login));
+      .then(client => client.createRegistrationLink(uid, data, login));
+  }
+
+  static getBalance(service, data){
+    return Client.forService(service)
+      .then(client => client.getBalance(data));
   }
 
   static payout(service, data){
