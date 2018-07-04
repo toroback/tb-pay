@@ -103,7 +103,11 @@ class Client {
               .then(account =>{
                 if(!account) account = new PayAccount({service: service, uid: uid, status: "pending"});
                 
-                account.status = docData.status;
+                if(account.status == "approved" && docData.status == "processing"){
+                  //Si el estado nuevo es processing pero la cuenta ya está en estado Approved, no se hace anda
+                }else{
+                  account.status = docData.status;
+                }
                 account.sUserId = docData.sUserId;
                 account.originalResponse = data;
                 return account.save();              
