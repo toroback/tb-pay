@@ -193,28 +193,46 @@ class Client {
             });
 
           }else{
+           
             //Si no existe cuenta o no está aprobada se pedirá el link al servicio
-            let linkUrl = undefined;
+            if(!account) account = new App.db.model('tb.pay-accounts')({service: service, uid: user._id});
+            account.originalRequest = {
+              uid: user._id,
+              data: data,
+              login: forLogin
+            }
+            account.status = "pending";
 
-            this.requestLink(user, account, data, forLogin)
-              .then(res => {
-                linkUrl = res.response.link;
-                
-                if(!account) account = new App.db.model('tb.pay-accounts')({service: service, uid: user._id});
-                if(!account.data) account.data = {};
-                Object.assign(account.data, res.response.data); //Se asigna la información específica del servicio
+            if(account._id) account.uDate = new Date();
 
-                account.status = "pending";
-                account.originalRequest = res.request;
-                account.originalResponse = res.response;
-                
-                if(account._id) account.uDate = new Date();
+            account.save()
+              .then(doc => {
+                let linkUrl = undefined;
+                this.requestLink(user, doc, data, forLogin)
+                  .then(res => {
+                    linkUrl = res.response.link;
+                    
+                    // if(!account) account = new App.db.model('tb.pay-accounts')({service: service, uid: user._id});
+                    if(!doc.data) doc.data = {};
+                    Object.assign(doc.data, res.response.data); //Se asigna la información específica del servicio
 
-                return account.save();
+                    // account.status = "pending";
+                    // doc.originalRequest = {
+                    //   uid: user._id,
+                    //   data: data,
+                    //   login: forLogin,
+                    //   serviceRequest: res.request
+                    // }
+                    doc.originalResponse = res.response;
+                    
+                    doc.uDate = new Date();
+                    
+                    return doc.save();
+                  })
+                  .then(doc => resolve({url: linkUrl}))
+                  .catch(reject);
               })
-              .then(doc => resolve({url: linkUrl}))
-              .catch(reject);
-            
+             .catch(reject);
           }
         })
         .catch(reject);
