@@ -29,8 +29,8 @@ let schema  = new Schema ({
   direction:        { type: String, enum: ['in', 'out'], required: true }, // transaction direction: incoming or outgoing
   service:          { type: String, enum: utils.serviceList, required: true }, // service type (payoneer, paypal, etc...)
   uid:              { type: Schema.Types.ObjectId, required: true }, // user id (a2s.users) owner of this transaction
-  paid:             { type: Schema.Types.ObjectId, required: true }, // reference to account (tb.pay-account _id)
-  amount:           { type: String, required: true },   // amount to transfer
+  paid:             { type: Schema.Types.ObjectId }, // reference to account (tb.pay-account _id). no reference if payment method is not stored
+  amount:           { type: String, required: true, match: /^\d+(\.\d{1,2})?$/  },  // amount to transfer (regex: positive, optionaly float, 1 or 2 decimals)
   currency:         { type: String, required: true },   // ISO-4217 (alpha 3 currency)
   description:      { type: String },   // some optional description
   originalRequest:  { type: Schema.Types.Mixed },  // optional: original request made by client when creating the account

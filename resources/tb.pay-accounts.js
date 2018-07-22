@@ -31,7 +31,9 @@ let schema  = new Schema ({
     cDate:  { type: Date, default: Date.now }
   }, { _id: false })],
   // on response or hooks:
+  // sUserId should be named sAccountId in payoneer, it's an account! not a user :-/
   sUserId:          { type: String }, // service user id (internal reference from <service> service)
+  sAccountId:       { type: String }, // service account id (internal reference from <service> service)
   originalResponse: { type: Schema.Types.Mixed },  // optional: original response received by client when creating the account
   data:             { type: Schema.Types.Mixed }   // optional: specific data from <service> that needs to be kept
 },

@@ -10,6 +10,7 @@
  * </p>
  * <p>
  * {@link module:tb-pay-payoneer|Payoneer}
+ * {@link module:tb-pay-stripe|Stripe}
  * </p>
  *
  * 
@@ -354,6 +355,82 @@ class Client {
     });
   }
 
+  charge(data){
+    return new Promise((resolve,reject)=>{
+      let PayTransaction = App.db.model('tb.pay-transactions');
+      let PayAccount = App.db.model('tb.pay-accounts');
+      let User = App.db.model('users');
+      let chargeData = { };
+      let payTransaction;
+      let prom = [ ];
+      let error;
+      let ret;
+
+      // make sure uid and paid exist
+      prom.push( User.findById( data.uid, { 'firstName': 1, 'lastName': 1, 'email': 1 } ) ); // .0 user
+      prom.push( data.paid ? PayAccount.findOne( { '_id': data.paid, 'uid': data.uid } ) : undefined ); // .1 pay account, match account with user
+
+      Promise.all( prom )
+        .then( resp => {
+          let user       = resp[0]; // .0 user
+          let payAccount = resp[1]; // .1 pay account
+          // rest of fields will fail by DB validation
+          if ( !user )                     throw App.err.badRequest('Bad arguments: invalid uid');
+          if ( data.paid && !payAccount )     throw App.err.badRequest('Bad arguments: invalid paid');
+          if ( !data.paid && !data.token ) throw App.err.badRequest('Bad arguments: paid or token required');
+
+          // store transaction as processing (since charge has already been requested by user):
+          payTransaction = new PayTransaction( Object.assign({
+            direction:   'in',
+            service:     this.service,
+            status:      'processing'
+          }, data ));
+
+          // 'in' transaction status flow: 'processing' -> 'accepted' / 'rejected'
+
+          chargeData.payTransaction = payTransaction;
+          // optionals and extra:
+          chargeData.statementDescription = data.statementDescription;
+          chargeData.token      = data.token;
+          chargeData.store      = data.store;
+          chargeData.user       = user;
+          chargeData.payAccount = payAccount;
+
+          return payTransaction.save( );
+        })
+        .then( ( ) => this.adapter.charge( chargeData ) )
+        .then( charge => {
+          payTransaction.status = 'accepted';
+          payTransaction.sTransId = charge.sTransId;
+          payTransaction.originalRequest = charge.request;
+          payTransaction.originalResponse = charge.response;
+          payTransaction.data = charge.data;
+          return payTransaction.save( );
+        })
+        .catch( err => {
+          error = err;
+          if ( payTransaction ) {
+            payTransaction.status = 'rejected';
+            if ( err.request && err.response && err.error ) {
+              payTransaction.originalRequest = err.request;
+              payTransaction.originalResponse = err.response;
+              error = err.error;  // error comes from api
+            }
+          }
+          return payTransaction ? payTransaction.save( ) : undefined;
+        })
+        .then( ( ) => {
+          if ( error ) throw error;
+          let ret = payTransaction.toJSON( );
+          delete ret.originalRequest;
+          delete ret.originalResponse;
+          return { 'charge': ret };
+        })
+        .then(resolve)
+        .catch(reject);
+    });
+  }
+
   /**
    * Setup del módulo. Debe ser llamado antes de crear una instancia
    * @param {Object} _app Objeto App del servidor
@@ -442,10 +519,14 @@ class Client {
       .then(client => client.payout(data));
   }
 
-
   static echo(service){
     return Client.forService(service)
       .then(client => client.echo());
+  }
+
+  static charge(service, data){
+    return Client.forService(service)
+      .then(client => client.charge(data));
   }
 
   /**
@@ -538,6 +619,9 @@ function loadServiceAdapter(service){
       switch (service) {
         case "payoneer":
           moduleName = "tb-pay-payoneer";
+          break;
+        case "stripe":
+          moduleName = "tb-pay-stripe";
           break;
         default:
           // statements_def

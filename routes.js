@@ -63,11 +63,34 @@ function setupRoutes(App){
   });
 
 
-  router.get("/echo/:service/",function(req, res, next){
+  router.get('/echo/:service',function(req, res, next){
     let service = req.params.service;
     Client.echo(service)
       .then(resp => res.status(200).json(resp))
       .catch(next);
+  }); 
+
+/*
+ * Charge a user (tb.pay-transaction: in), from a stored account or with a token
+ * service:    String,   // so far... 'stripe'
+ * body: {
+ *   uid:         ObjectId, // toroback user _id
+ *   amount:      Number,   // amount to charge
+ *   currency:    String,   // currency of amount. ISO
+ *   paid:        ObjectId, // (optional.R) tb.pay-account _id (required if token is undefined)
+ *   token:       String,   // (optional.R) token representing a temporary account. depends on service (required if paid is undefined)
+ *   store:       Bool,     // (optional) store token as a new account for this user. needs token. default: false
+ *   description: String,   // (optional) description for this charge. shown to user in receipt
+ *   statementDescription: String, // (optional) description for this charge. shown to user in credit card statement. max: 22 characters (on stripe)
+ * }
+ */
+  router.post('/charge/:service', function(req, res, next){
+    let service = req.params.service;
+    let data = req.body;
+
+    Client.charge( service, data )
+      .then( resp => res.json( resp ) )
+      .catch( next );
   }); 
 
   App.app.use(`${App.baseRoute}/srv/pay`, router);
