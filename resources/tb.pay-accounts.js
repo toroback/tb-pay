@@ -15,7 +15,9 @@ var helper   = require("../helpers/tb.pay-accounts");
  * @property {String} status Account status
  * @property {Array}  statusLog status change logging
  * @property {String} statusLog.status Account status
+ * @property {String} statusLog.cDate Account status change timestamp
  * @property {String} sUserId Service user id (internal reference from <service> service)
+ * @property {String} sAccountId Account id (internal reference from <service> service)
  * @property {Object} [originalResponse] Original response received by client when creating the account
  * @property {Object} [data] Specific data from <service> that needs to be kept
  */ 

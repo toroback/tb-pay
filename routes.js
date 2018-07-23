@@ -70,20 +70,27 @@ function setupRoutes(App){
       .catch(next);
   }); 
 
-/*
- * Charge a user (tb.pay-transaction: in), from a stored account or with a token
- * service:    String,   // so far... 'stripe'
- * body: {
- *   uid:         ObjectId, // toroback user _id
- *   amount:      Number,   // amount to charge
- *   currency:    String,   // currency of amount. ISO
- *   paid:        ObjectId, // (optional.R) tb.pay-account _id (required if token is undefined)
- *   token:       String,   // (optional.R) token representing a temporary account. depends on service (required if paid is undefined)
- *   store:       Bool,     // (optional) store token as a new account for this user. needs token. default: false
- *   description: String,   // (optional) description for this charge. shown to user in receipt
- *   statementDescription: String, // (optional) description for this charge. shown to user in credit card statement. max: 22 characters (on stripe)
- * }
- */
+  /**
+   * Charge a user (tb.pay-transaction: in), from a stored account or with a token
+   * 
+   * @name Charge
+   *
+   * @route  {POST} srv/pay/:service
+   *
+   * @routeparam {String} service   Servicio a utilizar para el cobro (valores: stripe)
+   *
+   * @bodyparam  {String}   uid                     toroback user _id
+   * @bodyparam  {Number}   amount                  amount to charge. Para ver la cantidad minima ver la documentacion: `https://stripe.com/docs/currencies#minimum-and-maximum-charge-amounts` 
+   * @bodyparam  {String}   currency                currency of amount. ISO
+   * @bodyparam  {String}   [paid]                  tb.pay-account _id (required if token is undefined)
+   * @bodyparam  {Object}   [token]                 token representing a temporary account. depends on service (required if paid is undefined)
+   * @bodyparam  {Bool}     [store]                 store token as a new account for this user. needs token. default: false
+   * @bodyparam  {String}   [description]           description for this charge. shown to user in receipt
+   * @bodyparam  {String}   [statementDescription]  description for this charge. shown to user in credit card statement. max: 22 characters (on stripe)
+   *
+   * @return {tb.pay-transaction}  El objeto de la transacción
+   *  
+   */
   router.post('/charge/:service', function(req, res, next){
     let service = req.params.service;
     let data = req.body;

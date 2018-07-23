@@ -16,16 +16,25 @@ App.pay.init();
 
 ### **- Servicios disponibles:**
 Para poder utilizar un servicio se utilizarán los identificadores de cada uno de ellos.
-Por ahora los servicios disponibles son:
+
+Los servicios disponibles para pagos son:
 
 - **Payonner**
   + Nombre de módulo: [**tb-pay-payoneer**](https://github.com/toroback/tb-pay-payoneer)
   + Identificador: "payoneer"
   + [Página web](https://www.payoneer.com/)
 
+
+Los servicios disponibles para cobros son:
+
+- **Stripe**
+  + Nombre de módulo: [**tb-pay-stripe**](https://github.com/toroback/tb-pay-stripe)
+  + Identificador: "stripe"
+  + [Página web](https://www.stripe.com/)
+
 ### **- Configuración desde interfaz administrativa:** 
 
-Por el momento no la opción de configuración a través de la interfaz de administración no está disponible.
+Por el momento la opción de configuración a través de la interfaz de administración no está disponible.
 
 ### **- Configuración manual:**
 
@@ -33,7 +42,9 @@ La configuración manual se realiza sobre una colección en la base de datos lla
 
 Para ello hay que añadir un nuevo documento cuyo id sea el "payOptions" (Ej. "\_id":"payOptions"). Dicho documento debe tener un objeto para cada uno de los servicios que se quiera configurar cuya clave sea el identificador del servicio. 
 
-Para cada servicio configurado se requerirán los siguientes campos:
+#### **- Configuración del servicio Payoneer:**
+
+Para configurar Payoneer se requerirán los siguientes campos:
 
 | Clave | Tipo | Opcional   | Descripción |
 |---|---|:---:|---|
@@ -63,9 +74,30 @@ Un ejemplo de configuración del servicio *Payoneer* sería el siguiente:
 }
 ```
 
+#### **- Configuración del servicio Stripe:**
+
+Para configurar Stripe se requerirán los siguientes campos:
+
+| Clave | Tipo | Opcional   | Descripción |
+|---|---|:---:|---|
+|apiKey|String||Apikey privada proporcionada por el servicio|
+
+Un ejemplo de configuración del servicio *Payoneer* sería el siguiente:
+
+```
+{
+    "_id" : "payOptions",
+    "stripe" : {
+        "apiKey" : <myPrivateApiKey>
+    }
+}
+```
+
 ## **Funcionalidades**
 
 ### **- Obtener de link de registro/login:**
+
+Disponible para los servicios: Payoneer
 
 #### **• REST Api:**
 
@@ -168,6 +200,8 @@ Ver sección *Hooks -> Modificacion de parámetros de petición de enlace de reg
 
 ### **- Realizar un pago:**
 
+Disponible para los servicios: Payoneer
+
 #### **• REST Api:**
 
 No disponible.
@@ -189,7 +223,7 @@ No disponible.
 
 | Clave | Tipo | Opcional | Descripción |
 |---|---|:---:|---|
-|transaction|tb.pay-transaction||Objeto con la información de la transacción|
+|transaction|tb.pay-transactions||Objeto con la información de la transacción|
 
 **Ejemplo:**
 
@@ -215,7 +249,149 @@ App.pay.payout(service, data)
   .catch(err => console.log(err));
 ```
 
+### **- Realizar un cobro:**
+
+Disponible para los servicios: Stripe
+
+Charge a user (tb.pay-transactions: in), from a stored account or with a token
+
+#### **• REST Api:**
+
+|HTTP Method|URL|
+|:---:|:---|
+|POST| `https://[domain]:[port]/api/v[apiVersion]/srv/pay/charge/:service`|
+
+**Parámetros en la ruta:**
+
+| Clave | Tipo | Opcional   | Descripción  |
+|---|---|:---:|---|
+|service|String||Servicio de pago para realizar el cobro (valores: stripe)|
+
+**Parámetros del body:**
+
+| Clave | Tipo | Opcional   | Descripción  |
+|---|---|:---:|---|
+|uid|String||toroback user _id|
+|amount|Number||amount to charge. Para ver la cantidad minima ver la documentacion: `https://stripe.com/docs/currencies#minimum-and-maximum-charge-amounts`|
+|currency|String||currency of amount. ISO|
+|paid|String|X|tb.pay-account _id (required if token is undefined)|
+|token|String|X|token representing a temporary account. depends on service (required if paid is undefined)|
+|store|Bool|X|store token as a new account for this user. needs token. default: false|
+|description|String|X|description for this charge. shown to user in receipt|
+|statementDescription|String|X|description for this charge. shown to user in credit card statement. max: 22 characters (on stripe)|
+
+**Respuesta:**
+
+| Clave | Tipo | Opcional | Descripción |
+|---|---|:---:|---|
+|transaction|tb.pay-transactions||Objeto con la información de la transacción|
+
+##### **- Ejemplo REST 1: Cobro con token sin creación de cuenta**
+
+POST: `https://a2server.a2system.net:1234/api/v1/srv/pay/charge/stripe`
+
+Body:
+
+```js
+{
+  "uid": "59c43f31aeXX437956fffX2e",
+  "amount": 0.39,
+  "currency": "USD",
+  "token": "tok_1CqjooG5RtxSooBrAUdVWn0K",
+  "store": false, //False para no crear cuenta
+  "description": "My receipt description",
+  "statementDescription": "My card statement description"
+}
+```
+
+##### **- Ejemplo REST 2: Cobro con token con creación de cuenta**
+
+POST: `https://a2server.a2system.net:1234/api/v1/srv/pay/charge/stripe`
+
+Body:
+
+```js
+{
+  "uid": "59c43f31aeXX437956fffX2e",
+  "amount": 0.39,
+  "currency": "USD",
+  "token": "tok_1CqjooG5RtxSooBrAUdVWn0K",
+  "store": true, //True para crear cuenta
+  "description": "My receipt description",
+  "statementDescription": "My card statement description"
+}
+```
+
+##### **- Ejemplo REST 3: Cobro a cuenta**
+
+POST: `https://a2server.a2system.net:1234/api/v1/srv/pay/charge/stripe`
+
+Body:
+
+```js
+{
+  "uid": "59c43f31aeXX437956fffX2e",
+  "amount": 0.39,
+  "currency": "USD",
+  "paid":"5b54a20af7bde109c8c0e0e2",
+  "description": "My receipt description",
+  "statementDescription": "My card statement description"
+}
+```
+
+#### **• Código Javascript:**
+
+**Parámetros:**
+
+| Clave | Tipo | Opcional   | Descripción  |
+|---|---|:---:|---|
+|service|String||Identificador del servicio a utilizar (Ej: "stripe")|
+|data|Object||Información del cobro que se va a realizar|
+|data.uid|String||toroback user _id|
+|data.amount|Number||amount to charge. Para ver la cantidad minima ver la documentacion: `https://stripe.com/docs/currencies#minimum-and-maximum-charge-amounts`|
+|data.currency|String||currency of amount. ISO|
+|data.paid|String|X|tb.pay-account _id (required if token is undefined)|
+|data.token|String|X|token representing a temporary account. depends on service (required if paid is undefined)|
+|data.store|Bool|X|store token as a new account for this user. needs token. default: false|
+|data.description|String|X|description for this charge. shown to user in receipt|
+|data.statementDescription|String|X|description for this charge. shown to user in credit card statement. max: 22 characters (on stripe)|
+
+**Respuesta:**
+
+| Clave | Tipo | Opcional | Descripción |
+|---|---|:---:|---|
+|transaction|tb.pay-transactions||Objeto con la información de la transacción|
+
+**Ejemplo:**
+
+```javascript
+var service = "stripe";
+
+var data = {
+  "uid": "59c43f31aeXX437956fffX2e",
+  "amount": 0.39,
+  "currency": "USD",
+  "token": "tok_1CqjooG5RtxSooBrAUdVWn0K",
+  "store": false, //False para no crear cuenta
+  "description": "My receipt description",
+  "statementDescription": "My card statement description"
+}
+
+//Opcion 1 : obteniendo un objeto cliente para el servicio.
+App.pay.forService(service)
+  .then(client => client.charge(data));
+  .then(resp => console.log(resp))
+  .catch(err => console.log(err));
+
+//Opcion 2 : Sin obtener instancia del cliente del servicio. (Se instancia internamente)
+App.pay.charge(service, data)
+  .then(resp => console.log(resp))
+  .catch(err => console.log(err));
+```
+
 ### **- Obtener balance del servicio:**
+
+Disponible para los servicios: Payoneer, Stripe
 
 #### **• REST Api:**
 
@@ -229,7 +405,7 @@ App.pay.payout(service, data)
 
 | Clave | Tipo | Opcional   | Descripción  |
 |---|---|:---:|---|
-|service|String||Servicio de pago a utilizar (valores: payoneer)|
+|service|String||Servicio de pago a utilizar (valores: payoneer, stripe)|
 
 **Parámetros del query:**
 
@@ -436,9 +612,9 @@ El siguiente ejemplo modifica el nombre y el apellido del contacto y añade una 
   });
 ```
 
-### **• Evento de modificación de un objeto tb.pay-transaction:**
+### **• Evento de modificación de un objeto tb.pay-transactions:**
 
-Para recibir un evento cada vez que sea actualizado un objeto 'tb.pay-transaction' basta con añadir un hook. 
+Para recibir un evento cada vez que sea actualizado un objeto 'tb.pay-transactions' basta con añadir un hook. 
 
 Dicho hook se debe realizar a la función `transactionUpdated` y se puede configurar, por ejemplo, en el momento de inicialización del módulo en el archivo `"boot.js"`, de la siguiente manera:
 
@@ -449,5 +625,54 @@ Dicho hook se debe realizar a la función `transactionUpdated` y se puede config
     //...
   });
 ```
+
+## **Modelos**
+
+### tb.pay-accounts
+
+Modelo de datos que contiene información sobre una cuenta de pago
+
+| Clave | Tipo | Opcional | Descripción |
+|---|---|:---:|---|
+|uid|ObjectId||uid Owner user id (a2s.users)|
+|service|String||Service type (payoneer, paypal, etc...)|
+|originalRequest|Object|X|Original request made by client when creating the account|
+|status|String||Account status|
+|statusLog|Array||status change logging|
+|statusLog.status|String||Account status|
+|statusLog.cDate|Date||Account status change timestamp|
+|sUserId|String||Service user id (internal reference from <service> service)|
+|sAccountId|String||Account id (internal reference from <service> service)|
+|originalResponse|Object|X|Original response received by client when creating the account|
+|data|Object|X|Specific data from <service> that needs to be kept|
+|data.programId|String|X|(SOLO PAYONEER) Program id for service|
+|data.type|String|X|(SOLO STRIPE) Transaction account type|
+|data.brand|String|X|(SOLO STRIPE) If type is 'card'. Card brand|
+|data.country|String|X|(SOLO STRIPE) If type is 'card'. Card country|
+|data.endsIn|String|X|(SOLO STRIPE) If type is 'card'. Last 4 digits of Card number |
+|data.expires|String|X|(SOLO STRIPE) If type is 'card'. Card expiration (format: "mmdd")|
+
+### tb.pay-transactions
+
+Modelo de datos que contiene información sobre una transacción
+
+| Clave | Tipo | Opcional | Descripción |
+|---|---|:---:|---|
+|direction|String||Transaction direction: incoming or outgoing|
+|service|String||Service type (payoneer, paypal, etc...)|
+|uid|ObjectId||User id (a2s.users) owner of this transaction|
+|paid|ObjectId||Reference to account (tb.pay-account _id)|
+|amount|String||Amount to transfer|
+|currency|String||ISO-4217 (alpha 3 currency)|
+|description|String|X|Some optional description|
+|originalRequest|Object|X|Original request made by client when creating the account|
+|status|String||Transaction status|
+|statusLog|Array||Status change logging|
+|statusLog.status|String||Account status|
+|statusLog.cDate|Date||Account status change timestamp|
+|sTransId|String||Service transaction id (internal reference from <service> service)|
+|originalResponse|Object|X|Original response received by client when creating the account|
+|data|Object|X|Specific data from <service> that needs to be kept|
+
 
 

@@ -6,7 +6,7 @@ var mongoose = require('mongoose'),
 var helper   = require("../helpers/tb.pay-transactions");
 
 /** 
- * Modelo de datos que contiene información sobre una cuenta de pago
+ * Modelo de datos que contiene información sobre una transacción
  * @class PayTransactionSchema
  * @memberOf module:tb-pay
  * @property {String}   direction Transaction direction: incoming or outgoing
@@ -20,6 +20,7 @@ var helper   = require("../helpers/tb.pay-transactions");
  * @property {String}   status Transaction status
  * @property {Array}    statusLog Status change logging
  * @property {String}   statusLog.status Account status
+ * @property {String}   statusLog.cDate Fecha de cambio de estado
  * @property {String}   sTransId Service transaction id (internal reference from <service> service)
  * @property {Object}   [originalResponse] Original response received by client when creating the account
  * @property {Object}   [data] Specific data from <service> that needs to be kept
