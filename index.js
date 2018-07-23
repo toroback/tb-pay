@@ -441,7 +441,7 @@ class Client {
       App = app;
       log = App.log.child({module:'pay'});
 
-      log.debug("iniciando Módulo Pay");
+      log.info('Setup: Pay');
 
       loadConfigOptions()
         .then(setupExports)
@@ -486,6 +486,8 @@ class Client {
         loadServiceAdapter(service)
           .then(adapter =>{
             let config = getServiceConfig(service);
+            if(!config) throw new Error(service + ' options not configured');
+
             let newClient =  new Client(service,config,adapter);
             loadedClients[service] = newClient;
             resolve(newClient);
@@ -592,23 +594,12 @@ class Client {
   // },
 }
 
-
-// function loadServiceConfig(service){
-//   return new Promise((resolve, reject) =>{
-//     if(payOptions[service]){
-//       resolve(payOptions[service]);
-//     }else{
-//       reject(new Error(service + ' options not configured'));
-//     }
-//   });
-// }
-
 function getServiceConfig(service){
-  if(payOptions[service]){
+  // if(payOptions[service]){
     return payOptions[service];
-  }else{
-    throw new Error(service + ' options not configured');
-  }
+  // }else{
+  //   throw new Error(service + ' options not configured');
+  // }
 }
 
 function loadServiceAdapter(service){
@@ -663,33 +654,38 @@ function setupExports(){
     Client.accountStatusList     = utils.accountStatusList;
     Client.transactionStatusList = utils.transactionStatusList;
 
-    exportPayoneerCurrencies();
-    resolve();
+    let aModuleConfigured = false;
+    Client.serviceList.forEach(service =>{
+      if(getServiceConfig(service)){
+        aModuleConfigured = true;
+      }
+    });
+    if(!aModuleConfigured){
+      reject(new App.err.notFound("No Pay service configured"));
+    }else{
+      exportPayoneerCurrencies();
+      resolve();
+    }
       // .then(resolve)
       // .catch(reject);
   });
 }
 
-function exportPayoneerCurrencies(){
-  // return new Promise((resolve, reject) => {
-    let config = getServiceConfig("payoneer");
-    if(config && config.programs && config.programs.length){
+function exportPayoneerCurrencies(){  
+  // let config = getServiceConfig("payoneer");
+  // if(config && config.programs && config.programs.length){
+  //   Client.payoneer = {currencies:  Object.freeze(config.programs.map( e => e.currency ))};
+  // }else{
+  //   log.warn("Payoneer programs not configured");
+  // }
+  let config = getServiceConfig("payoneer");
+  if(config){
+    if(config.programs && config.programs.length){
       Client.payoneer = {currencies:  Object.freeze(config.programs.map( e => e.currency ))};
     }else{
-      log.warn("Payoneer programs not configured");
+      log.warn("Payoneer programs not configured");  
     }
-    // resolve();
-    // loadServiceConfig("payoneer")
-    //   .then(payoneerConfig => {
-    //     if(payoneerConfig.programs){
-    //       Client.payoneer = {currencies:  Object.freeze(payoneerConfig.programs.map( e => e.currency ))};
-    //     }else{
-    //       log.info("payoneer programs not configured");
-    //     }
-    //     resolve();
-    //   })
-    //   .catch(reject);
-  // });
+  }
 }
 
 function loadConfigOptions(){
