@@ -4,19 +4,23 @@ let log = App.log.child( { module: 'helper_tb.pay-accounts' } );
 let mongoose  = require('mongoose');
 
 
-// field hiding from toJSON
-function xformFields(doc, ret, options) {
-  
+// transform / hide sensitive data on toJSON
+function transform(doc, ret, options) {
+  delete ret.originalRequest;
+  delete ret.originalResponse;
+  delete ret.sAccountId;
+  delete ret.sUserId;
+  return ret;
 }
 
 /// Hooks
 
 // pre validate
-function preValidateHook(doc) {
-  return new Promise( (resolve, reject) => {
-    resolve();
-  });
-}
+// function preValidateHook(doc) {
+//   return new Promise( (resolve, reject) => {
+//     resolve();
+//   });
+// }
 
 // pre save
 function preSaveHook(doc) {
@@ -44,16 +48,16 @@ function preSaveHook(doc) {
 }
 
 // post save
-function postSaveHook(doc) {
-   return new Promise( (resolve, reject) => {
-    resolve();
-  });
-}
+// function postSaveHook(doc) {
+//    return new Promise( (resolve, reject) => {
+//     resolve();
+//   });
+// }
 
 module.exports = {
-  xformFields: xformFields,
+  transform: transform,
   // hooks
-  preValidateHook: preValidateHook,
+  // preValidateHook: preValidateHook,
   preSaveHook: preSaveHook,
-  postSaveHook: postSaveHook
+  // postSaveHook: postSaveHook
 };

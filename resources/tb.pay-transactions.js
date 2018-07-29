@@ -55,13 +55,13 @@ schema.index({ service: 1 });
 schema.index({ status: 1 });
 
 // ---> Output:
-schema.set('toJSON', { virtuals: true });
+schema.set('toJSON', { virtuals: true, transform: helper.transform });
 
 // ---> Virtuals:
 schema.virtual('user', { ref: 'a2s.user', localField: 'uid', foreignField: '_id', justOne: true });
 schema.virtual('account', { ref: 'tb.pay-accounts', localField: 'paid', foreignField: '_id', justOne: true });
 
-//hooks  
+// ---> Hooks:
 // schema.pre('validate', function(next, ctx) {  // this can NOT be an arrow function
 //   console.log('========>>> HOOK: pre validate (tb.pay-transactions)');
 //   helper.preValidateHook(this)
@@ -72,14 +72,14 @@ schema.virtual('account', { ref: 'tb.pay-accounts', localField: 'paid', foreignF
 schema.pre('save', function(next, ctx) {  // this can NOT be an arrow function
   console.log('========>>> HOOK: pre save (tb.pay-transactions)');
   helper.preSaveHook(this)
-    .then(next)
+    .then( ( ) => next( ) ) // make sure nothing is passed to next( ) on success
     .catch(next);
 });
 
 schema.post('save', function(doc, next) {  // this can NOT be an arrow function
   console.log('========>>> HOOK: post save (tb.pay-transactions)');
   helper.postSaveHook(doc)
-    .then(next)   // this post hook DOES have flow control (next)
+    .then( ( ) => next( ) ) // this post hook DOES have flow control (next)
     .catch(next);
 });
 

@@ -48,13 +48,13 @@ schema.index({ service: 1 });
 schema.index({ status: 1 });
 
 // ---> Output:
-schema.set('toJSON', { virtuals: true });
+schema.set('toJSON', { virtuals: true, transform: helper.transform });
 
 // ---> Virtuals:
 schema.virtual('user', { ref: 'a2s.user', localField: 'uid', foreignField: '_id', justOne: true });
 
 
-//hooks  
+// ---> Hooks:
 // schema.pre('validate', function(next, ctx) {  // this can NOT be an arrow function
 //   console.log('========>>> HOOK: pre validate (tb.pay-accounts)');
 //   helper.preValidateHook(this)
@@ -65,7 +65,7 @@ schema.virtual('user', { ref: 'a2s.user', localField: 'uid', foreignField: '_id'
 schema.pre('save', function(next, ctx) {  // this can NOT be an arrow function
   console.log('========>>> HOOK: pre save (tb.pay-accounts)');
   helper.preSaveHook(this)
-    .then(next)
+    .then( ( ) => next( ) ) // make sure nothing is passed to next( ) on success
     .catch(next);
 });
 
